@@ -19,22 +19,25 @@ namespace SmartTrader.Infrastructure.Strategies
             _exchangeService = exchangeService;
         }
 
-        public async Task<StrategySignal> ExecuteAsync(Position position, Wallet wallet, Strategy strategy)
+        public async Task<StrategySignal> ExecuteAsync(StrategyContext context)
         {
-            var lastPrice = await _exchangeService.GetLastPriceAsync(position.Symbol);
-            if (lastPrice == 0) return new StrategySignal { Signal = SignalType.Hold, Reason = "Price not available." };
+            // تمام اطلاعات مورد نیاز از context در دسترس است
+            var position = context.Position;
+            var strategy = context.Strategy;
+            var pnlPercentage = context.CurrentPnlPercentage;
 
-            decimal pnlPercentage = (position.PositionSide == "LONG")
-                ? (lastPrice - position.EntryPrice) / position.EntryPrice
-                : (position.EntryPrice - lastPrice) / position.EntryPrice;
+            if (!pnlPercentage.HasValue)
+            {
+                return new StrategySignal { Signal = SignalType.Hold, Reason = "PNL not calculated." };
+            }
 
-            if (strategy.TakeProfitPercentage.HasValue && pnlPercentage >= strategy.TakeProfitPercentage.Value / 100)
+            if (strategy.TakeProfitPercentage.HasValue && pnlPercentage.Value >= strategy.TakeProfitPercentage.Value / 100)
             {
                 _logger.LogInformation("Take Profit triggered for position {PositionID}", position.PositionID);
                 return new StrategySignal { Signal = SignalType.Close, Reason = "Take Profit reached." };
             }
 
-            if (strategy.StopLossPercentage.HasValue && pnlPercentage <= -strategy.StopLossPercentage.Value / 100)
+            if (strategy.StopLossPercentage.HasValue && pnlPercentage.Value <= -strategy.StopLossPercentage.Value / 100)
             {
                 _logger.LogInformation("Stop Loss triggered for position {PositionID}", position.PositionID);
                 return new StrategySignal { Signal = SignalType.Close, Reason = "Stop Loss reached." };

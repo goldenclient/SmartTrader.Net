@@ -68,11 +68,21 @@ namespace SmartTrader.WorkerService.Workers
                                 // 1. Create exchange service
                                 var exchangeService = exchangeFactory.CreateService(wallet, exchange);
 
-                                // 2. Create strategy handler
-                                var strategyHandler = strategyFactory.CreateStrategy(strategy, exchangeService);
+                                // ۲. ساخت آبجکت Context برای استراتژی ورود
+                                var context = new StrategyContext
+                                {
+                                    Position = null, // پوزیشنی وجود ندارد
+                                    Wallet = wallet,
+                                    Strategy = strategy,
+                                    Symbol = symbol, // پراپرتی جدید در StrategyContext
+                                                     // Klines = await exchangeService.GetKlinesAsync(symbol),
+                                                     // Rsi = IndicatorCalculator.CalculateRsi(...)
+                                };
 
-                                // 3. Execute strategy (برای استراتژی ورود، پوزیشن null است)
-                                var signal = await strategyHandler.ExecuteAsync(null, wallet, strategy);
+                                // ۳. ساخت و اجرای استراتژی
+                                var strategyHandler = strategyFactory.CreateStrategy(strategy, exchangeService);
+                                var signal = await strategyHandler.ExecuteAsync(context);
+
 
                                 if (signal.Signal == SignalType.OpenLong || signal.Signal == SignalType.OpenShort)
                                 {

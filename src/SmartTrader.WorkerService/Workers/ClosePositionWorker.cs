@@ -65,14 +65,26 @@ namespace SmartTrader.WorkerService.Workers
                             continue;
                         }
 
-                        // 1. Create the correct exchange service using the factory
                         var exchangeService = exchangeFactory.CreateService(wallet, exchange);
 
-                        // 2. Create the correct strategy handler using the factory
-                        var strategyHandler = strategyFactory.CreateStrategy(exitStrategy, exchangeService);
+                        // 2. جمع‌آوری اطلاعات و ساخت Context
+                        var context = new StrategyContext
+                        {
+                            Position = position,
+                            Wallet = wallet,
+                            Strategy = exitStrategy,
+                            CurrentPrice = await exchangeService.GetLastPriceAsync(position.Symbol),
+                            WalletFreeBalance = await exchangeService.GetFreeBalanceAsync(),
+                            // History = await positionRepo.GetHistoryByPositionIdAsync(position.PositionID),
+                            // Klines = await exchangeService.GetKlinesAsync(position.Symbol),
+                            // Rsi = IndicatorCalculator.CalculateRsi(klines)
+                        };
+                        context.CurrentPnlPercentage = (context.CurrentPrice - position.EntryPrice) / position.EntryPrice; // ... محاسبه دقیق
 
-                        // 3. Execute the strategy to get a signal
-                        var signal = await strategyHandler.ExecuteAsync(position, wallet, exitStrategy);
+                        // 3. ساخت و اجرای استراتژی
+                        var strategyHandler = strategyFactory.CreateStrategy(exitStrategy, exchangeService);
+                        var signal = await strategyHandler.ExecuteAsync(context);
+
 
                         // 4. Act based on the signal
                         if (signal.Signal == SignalType.Close)
