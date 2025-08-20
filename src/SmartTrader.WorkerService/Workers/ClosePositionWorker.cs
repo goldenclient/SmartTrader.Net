@@ -66,6 +66,7 @@ namespace SmartTrader.WorkerService.Workers
                         }
 
                         var exchangeService = exchangeFactory.CreateService(wallet, exchange);
+                        var klines = await exchangeService.GetKlinesAsync(position.Symbol);
 
                         // 2. جمع‌آوری اطلاعات و ساخت Context
                         var context = new StrategyContext
@@ -76,7 +77,7 @@ namespace SmartTrader.WorkerService.Workers
                             CurrentPrice = await exchangeService.GetLastPriceAsync(position.Symbol),
                             WalletFreeBalance = await exchangeService.GetFreeBalanceAsync(),
                             // History = await positionRepo.GetHistoryByPositionIdAsync(position.PositionID),
-                            // Klines = await exchangeService.GetKlinesAsync(position.Symbol),
+                            Klines = klines,
                             // Rsi = IndicatorCalculator.CalculateRsi(klines)
                         };
                         context.CurrentPnlPercentage = (context.CurrentPrice - position.EntryPrice) / position.EntryPrice; // ... محاسبه دقیق

@@ -67,6 +67,7 @@ namespace SmartTrader.WorkerService.Workers
 
                                 // 1. Create exchange service
                                 var exchangeService = exchangeFactory.CreateService(wallet, exchange);
+                                var klines = await exchangeService.GetKlinesAsync(symbol);
 
                                 // ۲. ساخت آبجکت Context برای استراتژی ورود
                                 var context = new StrategyContext
@@ -75,7 +76,7 @@ namespace SmartTrader.WorkerService.Workers
                                     Wallet = wallet,
                                     Strategy = strategy,
                                     Symbol = symbol, // پراپرتی جدید در StrategyContext
-                                                     // Klines = await exchangeService.GetKlinesAsync(symbol),
+                                    Klines = klines,
                                                      // Rsi = IndicatorCalculator.CalculateRsi(...)
                                 };
 

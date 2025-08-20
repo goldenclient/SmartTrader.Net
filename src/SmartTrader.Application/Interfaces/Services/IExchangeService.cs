@@ -2,6 +2,7 @@
 using SmartTrader.Domain.Entities;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using SmartTrader.Application.Models; // این using را اضافه کنید
 
 namespace SmartTrader.Application.Interfaces.Services
 {
@@ -22,5 +23,7 @@ namespace SmartTrader.Application.Interfaces.Services
         Task<decimal> GetLastPriceAsync(string symbol);
         Task<OrderResult> OpenPositionAsync(string symbol, string side, decimal quantity);
         Task<OrderResult> ClosePositionAsync(string symbol, string side, decimal quantity);
+        Task<IEnumerable<Kline>> GetKlinesAsync(string symbol); // متد جدید
+
     }
 }

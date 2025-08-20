@@ -4,6 +4,7 @@ using Binance.Net.Enums;
 using CryptoExchange.Net.Authentication;
 using Microsoft.Extensions.Logging;
 using SmartTrader.Application.Interfaces.Services;
+using SmartTrader.Application.Models;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -56,6 +57,26 @@ namespace SmartTrader.Infrastructure.Services
             return result.Success
                 ? new OrderResult { IsSuccess = true, OrderId = result.Data.Id, AveragePrice = result.Data.AveragePrice, Quantity = result.Data.Quantity }
                 : new OrderResult { IsSuccess = false, ErrorMessage = result.Error?.Message };
+        }
+
+        public async Task<IEnumerable<Kline>> GetKlinesAsync(string symbol)
+        {
+            var result = await _client.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, Binance.Net.Enums.KlineInterval.OneHour);
+            if (!result.Success)
+            {
+                return Enumerable.Empty<Kline>();
+            }
+
+            // تبدیل داده‌های بایننس به مدل مستقل ما
+            return result.Data.Select(k => new Kline
+            {
+                OpenTime = k.OpenTime,
+                OpenPrice = k.OpenPrice,
+                HighPrice = k.HighPrice,
+                LowPrice = k.LowPrice,
+                ClosePrice = k.ClosePrice,
+                Volume = k.Volume
+            });
         }
     }
 }
