@@ -27,14 +27,15 @@ namespace SmartTrader.Infrastructure.Persistence.Repositories
 
         public async Task<IEnumerable<Position>> GetOpenPositionsAsync()
         {
-            const string sql = "SELECT * FROM Positions WHERE Status = 'OPEN'";
+            // از نام Enum برای فیلتر کردن استفاده می‌کنیم
+            const string sql = "SELECT * FROM Positions WHERE Status = 'Open'";
             using var connection = CreateConnection();
             return await connection.QueryAsync<Position>(sql);
         }
 
         public async Task<bool> HasOpenPositionAsync(int walletId, string symbol)
         {
-            const string sql = "SELECT COUNT(1) FROM Positions WHERE WalletID = @WalletID AND Symbol = @Symbol AND Status = 'OPEN'";
+            const string sql = "SELECT COUNT(1) FROM Positions WHERE WalletID = @WalletID AND Symbol = @Symbol AND Status = 'Open'";
             using var connection = CreateConnection();
             return await connection.ExecuteScalarAsync<bool>(sql, new { WalletID = walletId, Symbol = symbol });
         }

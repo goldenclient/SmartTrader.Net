@@ -5,6 +5,8 @@ using SmartTrader.Application.Interfaces.Strategies;
 using SmartTrader.Infrastructure.Persistence.Repositories;
 using SmartTrader.Infrastructure.Services;
 using SmartTrader.Infrastructure.Strategies;
+using SmartTrader.Infrastructure.Strategies.Entry;
+using SmartTrader.Infrastructure.Strategies.Exit;
 using SmartTrader.WorkerService.Workers;
 
 Host.CreateDefaultBuilder(args)
@@ -15,6 +17,7 @@ Host.CreateDefaultBuilder(args)
         services.AddScoped<IStrategyRepository, StrategyRepository>();
         services.AddScoped<IPositionRepository, PositionRepository>();
         services.AddScoped<IExchangeRepository, ExchangeRepository>(); // ریپازیتوری جدید
+        services.AddScoped<ICoinRepository, CoinRepository>(); // ثبت ریپازیتوری جدید
 
         // ثبت Factory ها
         services.AddScoped<IExchangeServiceFactory, ExchangeServiceFactory>();
@@ -25,8 +28,8 @@ Host.CreateDefaultBuilder(args)
         services.AddHostedService<ClosePositionWorker>();
 
         // ثبت کلاس‌های استراتژی به صورت Transient
-        // services.AddTransient<TakeProfitStopLossExitStrategy>();
-        // services.AddTransient<RsiMacdEntryStrategy>();
+        services.AddTransient<RsiMacdEntryStrategy>();
+        services.AddTransient<TakeProfitStopLossExitStrategy>();
 
     })
     .Build()

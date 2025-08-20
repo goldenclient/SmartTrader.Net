@@ -1,4 +1,5 @@
-﻿namespace SmartTrader.Application.Models
+﻿// src/SmartTrader.Application/Models/StrategySignal.cs
+namespace SmartTrader.Application.Models
 {
     public enum SignalType { Hold, OpenLong, OpenShort, Close }
 
@@ -6,5 +7,11 @@
     {
         public SignalType Signal { get; set; } = SignalType.Hold;
         public string Reason { get; set; }
+
+        // فیلدهای جدید برای استراتژی‌های ورود
+        public decimal? PercentBalance { get; set; }
+        public decimal? StopLoss { get; set; }
+        public decimal? TakeProfit { get; set; }
+        public int? Leverage { get; set; }
     }
 }

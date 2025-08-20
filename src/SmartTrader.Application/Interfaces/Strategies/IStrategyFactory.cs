@@ -1,11 +1,12 @@
 ﻿// src/SmartTrader.Application/Interfaces/Strategies/IStrategyFactory.cs
-using SmartTrader.Application.Interfaces.Services;
 using SmartTrader.Domain.Entities;
 
 namespace SmartTrader.Application.Interfaces.Strategies
 {
     public interface IStrategyFactory
     {
-        IStrategyHandler CreateStrategy(Strategy strategy, IExchangeService exchangeService);
+        IEntryStrategyHandler CreateEntryStrategy(Strategy strategy);
+        // پارامتر exchangeService حذف شد
+        IExitStrategyHandler CreateExitStrategy(Strategy strategy);
     }
 }

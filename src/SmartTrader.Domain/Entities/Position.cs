@@ -1,11 +1,11 @@
-﻿using System;
+﻿using SmartTrader.Domain.Enums;
+using System;
+// src/SmartTrader.Domain/Entities/Position.cs
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
-// src/SmartTrader.Domain/Entities/Position.cs
-using System;
 
 namespace SmartTrader.Domain.Entities
 {
@@ -17,8 +17,8 @@ namespace SmartTrader.Domain.Entities
         public int EntryStrategyID { get; set; }
         public int? ExitStrategyID { get; set; }
         public string Symbol { get; set; }
-        public string PositionSide { get; set; } // "LONG" or "SHORT"
-        public string Status { get; set; } // "OPEN" or "CLOSED"
+        public string PositionSide { get; set; }
+        public PositionStatus Status { get; set; } // از Enum استفاده می‌شود
         public decimal EntryPrice { get; set; }
         public decimal EntryValueUSD { get; set; }
         public decimal CurrentQuantity { get; set; }

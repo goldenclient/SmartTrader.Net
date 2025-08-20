@@ -1,8 +1,9 @@
 ﻿// src/SmartTrader.Infrastructure/Strategies/StrategyFactory.cs
-using Microsoft.Extensions.Logging;
-using SmartTrader.Application.Interfaces.Services;
+using Microsoft.Extensions.DependencyInjection; // using جدید
 using SmartTrader.Application.Interfaces.Strategies;
 using SmartTrader.Domain.Entities;
+using SmartTrader.Infrastructure.Strategies.Entry;
+using SmartTrader.Infrastructure.Strategies.Exit;
 using System;
 
 namespace SmartTrader.Infrastructure.Strategies
@@ -10,29 +11,32 @@ namespace SmartTrader.Infrastructure.Strategies
     public class StrategyFactory : IStrategyFactory
     {
         private readonly IServiceProvider _serviceProvider;
-        private readonly ILoggerFactory _loggerFactory;
 
-        public StrategyFactory(IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
+        public StrategyFactory(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
-            _loggerFactory = loggerFactory;
         }
 
-        public IStrategyHandler CreateStrategy(Strategy strategy, IExchangeService exchangeService)
+        public IEntryStrategyHandler CreateEntryStrategy(Strategy strategy)
         {
-            // بر اساس نام استراتژی در دیتابیس، کلاس مربوطه را برمی‌گردانیم
-            // این روش نیاز به ثبت تک تک استراتژی‌ها در Program.cs دارد
+            switch (strategy.StrategyName)
+            {
+                case "RsiMacdEntry":
+                    return _serviceProvider.GetRequiredService<RsiMacdEntryStrategy>();
+                default:
+                    throw new NotSupportedException($"Entry Strategy '{strategy.StrategyName}' is not supported.");
+            }
+        }
+
+        public IExitStrategyHandler CreateExitStrategy(Strategy strategy)
+        {
             switch (strategy.StrategyName)
             {
                 case "TakeProfitStopLossExit":
-                    var logger = _loggerFactory.CreateLogger<TakeProfitStopLossExitStrategy>();
-                    return new TakeProfitStopLossExitStrategy(logger, exchangeService);
-
-                // case "RsiMacdEntry":
-                //     return _serviceProvider.GetRequiredService<RsiMacdEntryStrategy>();
-
+                    // استراتژی با تمام وابستگی‌هایش از DI Container گرفته می‌شود
+                    return _serviceProvider.GetRequiredService<TakeProfitStopLossExitStrategy>();
                 default:
-                    throw new NotSupportedException($"Strategy '{strategy.StrategyName}' is not supported.");
+                    throw new NotSupportedException($"Exit Strategy '{strategy.StrategyName}' is not supported.");
             }
         }
     }

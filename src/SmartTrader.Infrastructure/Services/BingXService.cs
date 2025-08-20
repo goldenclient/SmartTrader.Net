@@ -1,6 +1,7 @@
 ﻿// src/SmartTrader.Infrastructure/Services/BingXService.cs
 using Microsoft.Extensions.Logging;
 using SmartTrader.Application.Interfaces.Services;
+using SmartTrader.Application.Models;
 using System;
 using System.Threading.Tasks;
 
@@ -39,6 +40,13 @@ namespace SmartTrader.Infrastructure.Services
         }
 
         public Task<OrderResult> OpenPositionAsync(string symbol, string side, decimal quantity)
+        {
+            _logger.LogInformation("BingX - Opening position for {symbol}", symbol);
+            // TODO: پیاده‌سازی منطق باز کردن پوزیشن در BingX
+            throw new NotImplementedException();
+        }
+
+        public Task<IEnumerable<Kline>> GetKlinesAsync(string symbol)
         {
             _logger.LogInformation("BingX - Opening position for {symbol}", symbol);
             // TODO: پیاده‌سازی منطق باز کردن پوزیشن در BingX

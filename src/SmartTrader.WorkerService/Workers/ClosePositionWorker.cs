@@ -28,83 +28,51 @@ namespace SmartTrader.WorkerService.Workers
 
                 using (var scope = _serviceProvider.CreateScope())
                 {
-                    // Resolve services from the scope
                     var positionRepo = scope.ServiceProvider.GetRequiredService<IPositionRepository>();
-                    var walletRepo = scope.ServiceProvider.GetRequiredService<IWalletRepository>();
                     var strategyRepo = scope.ServiceProvider.GetRequiredService<IStrategyRepository>();
+                    var strategyFactory = scope.ServiceProvider.GetRequiredService<IStrategyFactory>();
+                    var walletRepo = scope.ServiceProvider.GetRequiredService<IWalletRepository>();
                     var exchangeRepo = scope.ServiceProvider.GetRequiredService<IExchangeRepository>();
                     var exchangeFactory = scope.ServiceProvider.GetRequiredService<IExchangeServiceFactory>();
-                    var strategyFactory = scope.ServiceProvider.GetRequiredService<IStrategyFactory>();
 
-                    // Fetch all necessary data once and store in dictionaries for fast lookup
                     var openPositions = await positionRepo.GetOpenPositionsAsync();
                     if (!openPositions.Any()) continue;
 
+                    var strategies = (await strategyRepo.GetAllAsync()).ToDictionary(s => s.StrategyID);
                     var wallets = (await walletRepo.GetActiveWalletsAsync()).ToDictionary(w => w.WalletID);
                     var exchanges = (await exchangeRepo.GetAllAsync()).ToDictionary(e => e.ExchangeID);
-                    var strategies = (await strategyRepo.GetAllAsync()).ToDictionary(s => s.StrategyID);
 
                     foreach (var position in openPositions)
                     {
-                        // Find the related entities for the current position from the dictionaries
-                        if (!wallets.TryGetValue(position.WalletID, out var wallet))
-                        {
-                            _logger.LogWarning("Wallet with ID {WalletID} for position {PositionID} not found or is inactive.", position.WalletID, position.PositionID);
-                            continue;
-                        }
-
-                        if (!exchanges.TryGetValue(wallet.ExchangeID, out var exchange))
-                        {
-                            _logger.LogWarning("Exchange with ID {ExchangeID} for wallet {WalletID} not found.", wallet.ExchangeID, wallet.WalletID);
-                            continue;
-                        }
-
                         if (!position.ExitStrategyID.HasValue || !strategies.TryGetValue(position.ExitStrategyID.Value, out var exitStrategy))
                         {
-                            _logger.LogWarning("Exit strategy for position {PositionID} is not defined or not found.", position.PositionID);
+                            _logger.LogWarning("Exit strategy for position {PositionID} is not defined or found.", position.PositionID);
                             continue;
                         }
 
-                        var exchangeService = exchangeFactory.CreateService(wallet, exchange);
-                        var klines = await exchangeService.GetKlinesAsync(position.Symbol);
+                        // 1. ساخت هندلر استراتژی
+                        var strategyHandler = strategyFactory.CreateExitStrategy(exitStrategy);
 
-                        // 2. جمع‌آوری اطلاعات و ساخت Context
-                        var context = new StrategyContext
-                        {
-                            Position = position,
-                            Wallet = wallet,
-                            Strategy = exitStrategy,
-                            CurrentPrice = await exchangeService.GetLastPriceAsync(position.Symbol),
-                            WalletFreeBalance = await exchangeService.GetFreeBalanceAsync(),
-                            // History = await positionRepo.GetHistoryByPositionIdAsync(position.PositionID),
-                            Klines = klines,
-                            // Rsi = IndicatorCalculator.CalculateRsi(klines)
-                        };
-                        context.CurrentPnlPercentage = (context.CurrentPrice - position.EntryPrice) / position.EntryPrice; // ... محاسبه دقیق
+                        // 2. اجرای استراتژی فقط با ارسال پوزیشن
+                        var signal = await strategyHandler.ExecuteAsync(position);
 
-                        // 3. ساخت و اجرای استراتژی
-                        var strategyHandler = strategyFactory.CreateStrategy(exitStrategy, exchangeService);
-                        var signal = await strategyHandler.ExecuteAsync(context);
-
-
-                        // 4. Act based on the signal
+                        // 3. اقدام بر اساس سیگنال دریافتی
                         if (signal.Signal == SignalType.Close)
                         {
                             _logger.LogInformation("Closing position {PositionID} due to signal: {Reason}", position.PositionID, signal.Reason);
+
+                            if (!wallets.TryGetValue(position.WalletID, out var wallet) || !exchanges.TryGetValue(wallet.ExchangeID, out var exchange))
+                            {
+                                _logger.LogError("Could not find wallet/exchange to execute closing trade for position {PositionID}.", position.PositionID);
+                                continue;
+                            }
+
+                            var exchangeService = exchangeFactory.CreateService(wallet, exchange);
                             var closeResult = await exchangeService.ClosePositionAsync(position.Symbol, position.PositionSide, position.CurrentQuantity);
 
                             if (closeResult.IsSuccess)
                             {
-                                // Update the position in the database
-                                position.Status = "CLOSED";
-                                position.ProfitUSD = (closeResult.AveragePrice - position.EntryPrice) * position.CurrentQuantity * (position.PositionSide == "LONG" ? 1 : -1);
-                                position.CloseTimestamp = DateTime.UtcNow;
-                                await positionRepo.UpdateAsync(position);
-                                _logger.LogInformation("Position {PositionID} successfully closed in the database.", position.PositionID);
-                            }
-                            else
-                            {
-                                _logger.LogError("Failed to close position {PositionID} on the exchange: {Error}", position.PositionID, closeResult.ErrorMessage);
+                                // ... (آپدیت پوزیشن در دیتابیس)
                             }
                         }
                     }

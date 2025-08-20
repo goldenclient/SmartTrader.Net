@@ -1,19 +1,22 @@
-﻿using System;
+﻿// src/SmartTrader.Domain/Entities/Coin.cs
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Text.Json;
 
-// src/SmartTrader.Domain/Entities/Coin.cs
 namespace SmartTrader.Domain.Entities
 {
     public class Coin
     {
         public int CoinID { get; set; }
         public string CoinName { get; set; }
-        public string Symbol { get; set; }
-        public string? CoinType { get; set; }
         public string BaseCurrency { get; set; }
-        public string? ExchangeInfoJson { get; set; }
+        public string ExchangeInfoJson { get; set; }
+
+        public List<CoinExchangeInfo> GetExchangeInfo()
+        {
+            if (string.IsNullOrEmpty(ExchangeInfoJson))
+                return new List<CoinExchangeInfo>();
+            
+            return JsonSerializer.Deserialize<List<CoinExchangeInfo>>(ExchangeInfoJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
     }
 }
