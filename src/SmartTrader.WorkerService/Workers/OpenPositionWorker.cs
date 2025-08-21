@@ -103,13 +103,11 @@ namespace SmartTrader.WorkerService.Workers
                                         _logger.LogWarning("Calculated quantity {Quantity} is less than MinQuantity {MinQuantity} for {Symbol}. Skipping trade.", initialQuantity, filterInfo.MinQuantity, symbol);
                                         continue;
                                     }
-
                                     var adjustedQuantity = AdjustToStepSize(initialQuantity, filterInfo.StepSize);
-
-
-                                    var positionSide = signal.Signal == SignalType.OpenLong ? "LONG" : "SHORT";
-                                    var openResult = await exchangeService.OpenPositionAsync(symbol, positionSide, adjustedQuantity);
-
+                                    signal.Symbol = symbol;
+                                    signal.Quantity = adjustedQuantity;
+                                    // ارسال کل آبجکت سیگنال به سرویس صرافی
+                                    var openResult = await exchangeService.OpenPositionAsync(signal);
                                     if (openResult.IsSuccess)
                                     {
                                         // انتخاب استراتژی خروج
@@ -125,7 +123,7 @@ namespace SmartTrader.WorkerService.Workers
                                             EntryStrategyID = strategy.StrategyID,
                                             ExitStrategyID = exitStrategyId, // منطق جدید
                                             Symbol = symbol,
-                                            PositionSide = positionSide,
+                                            PositionSide = signal.Signal.ToString(),
                                             Status = PositionStatus.Open, // استفاده از Enum
                                             EntryPrice = openResult.AveragePrice,
                                             EntryValueUSD = positionValue,

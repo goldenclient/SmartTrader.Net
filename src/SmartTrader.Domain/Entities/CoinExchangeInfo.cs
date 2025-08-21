@@ -5,6 +5,5 @@ namespace SmartTrader.Domain.Entities
     {
         public string Exchange { get; set; }
         public string Symbol { get; set; }
-        public int Lot { get; set; }
     }
 }

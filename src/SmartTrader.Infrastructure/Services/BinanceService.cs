@@ -44,14 +44,42 @@ namespace SmartTrader.Infrastructure.Services
             return ticker.Success ? ticker.Data.LastPrice : 0;
         }
 
-        public async Task<OrderResult> OpenPositionAsync(string symbol, string side, decimal quantity)
+        public async Task<OrderResult> OpenPositionAsync(StrategySignal signal)
         {
-            var orderSide = side.ToUpper() == "LONG" ? OrderSide.Buy : OrderSide.Sell;
-            var result = await _client.UsdFuturesApi.Trading.PlaceOrderAsync(symbol, orderSide, FuturesOrderType.Market, quantity);
+            try
+            {
+                // 1. تنظیم نوع مارجین به ISOLATED
+                var marginTypeResult = await _client.UsdFuturesApi.Account.ChangeMarginTypeAsync(signal.Symbol, FuturesMarginType.Isolated);
+                if (!marginTypeResult.Success)
+                {
+                    // این خطا ممکن است در صورتی که پوزیشن باز وجود داشته باشد رخ دهد، پس فقط لاگ می‌کنیم
+                    _logger.LogWarning("Could not set margin type to ISOLATED for {Symbol}: {Error}", signal.Symbol, marginTypeResult.Error?.Message);
+                }
 
-            return result.Success
-                ? new OrderResult { IsSuccess = true, OrderId = result.Data.Id, AveragePrice = result.Data.AveragePrice, Quantity = result.Data.Quantity }
-                : new OrderResult { IsSuccess = false, ErrorMessage = result.Error?.Message };
+                // 2. تنظیم لوریج
+                if (signal.Leverage.HasValue)
+                {
+                    var leverageResult = await _client.UsdFuturesApi.Account.ChangeInitialLeverageAsync(signal.Symbol, signal.Leverage.Value);
+                    if (!leverageResult.Success)
+                    {
+                        _logger.LogError("Failed to set leverage to {Leverage} for {Symbol}: {Error}", signal.Leverage.Value, signal.Symbol, leverageResult.Error?.Message);
+                        return new OrderResult { IsSuccess = false, ErrorMessage = $"Failed to set leverage: {leverageResult.Error?.Message}" };
+                    }
+                }
+
+                // 3. باز کردن پوزیشن
+                var orderSide = signal.Signal == SignalType.OpenLong ? OrderSide.Buy : OrderSide.Sell;
+                var result = await _client.UsdFuturesApi.Trading.PlaceOrderAsync(signal.Symbol, orderSide, FuturesOrderType.Market, signal.Quantity);
+
+                return result.Success
+                    ? new OrderResult { IsSuccess = true, OrderId = result.Data.Id, AveragePrice = result.Data.AveragePrice, Quantity = result.Data.Quantity }
+                    : new OrderResult { IsSuccess = false, ErrorMessage = result.Error?.Message };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An unexpected error occurred while opening position for {Symbol}.", signal.Symbol);
+                return new OrderResult { IsSuccess = false, ErrorMessage = ex.Message };
+            }
         }
 
         public async Task<OrderResult> ClosePositionAsync(string symbol, string side, decimal quantity)

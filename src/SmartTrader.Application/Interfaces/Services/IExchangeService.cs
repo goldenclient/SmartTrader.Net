@@ -21,7 +21,7 @@ namespace SmartTrader.Application.Interfaces.Services
         // متد Initialize حذف شد
         Task<decimal> GetFreeBalanceAsync(string asset = "USDT");
         Task<decimal> GetLastPriceAsync(string symbol);
-        Task<OrderResult> OpenPositionAsync(string symbol, string side, decimal quantity);
+        Task<OrderResult> OpenPositionAsync(StrategySignal signal);
         Task<OrderResult> ClosePositionAsync(string symbol, string side, decimal quantity);
         Task<IEnumerable<Kline>> GetKlinesAsync(string symbol); // متد جدید
         Task<SymbolFilterInfo> GetSymbolFilterInfoAsync(string symbol); // متد جدید

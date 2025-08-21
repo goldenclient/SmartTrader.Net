@@ -39,9 +39,9 @@ namespace SmartTrader.Infrastructure.Services
             throw new NotImplementedException();
         }
 
-        public Task<OrderResult> OpenPositionAsync(string symbol, string side, decimal quantity)
+        public Task<OrderResult> OpenPositionAsync(StrategySignal signal)
         {
-            _logger.LogInformation("BingX - Opening position for {symbol}", symbol);
+            _logger.LogInformation("BingX - Opening position for {symbol}", signal.Symbol);
             // TODO: پیاده‌سازی منطق باز کردن پوزیشن در BingX
             throw new NotImplementedException();
         }
