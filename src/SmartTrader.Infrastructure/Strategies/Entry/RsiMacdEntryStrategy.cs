@@ -25,7 +25,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
                 return new StrategySignal { Reason = "Symbol not found for this exchange." };
 
             // یک سرویس موقت برای دریافت داده‌های عمومی بازار (بدون نیاز به کلید API)
-            var marketDataService = _exchangeFactory.CreateService(new Wallet { ApiKey = "", SecretKey = "" }, new Exchange { ExchangeName = exchangeName });
+            var marketDataService = _exchangeFactory.CreateService(new Wallet { ApiKey = "LFoqWEuTZpckOqoMTvVyj0tajAmPtdSAzGd0PpZeCh7P14ZTZHtKwvh0etdQszrL", SecretKey = "zRYFyQmIKCeNCKhJUIvYX31pTl5fS3LJNhuVHGdzmSoJ9haq1C960DBRbgTAVtpA" }, new Exchange { ExchangeName = exchangeName });
 
             var klines = await marketDataService.GetKlinesAsync(exchangeInfo.Symbol);
             if (!klines.Any()) return new StrategySignal { Reason = "Kline data not available." };

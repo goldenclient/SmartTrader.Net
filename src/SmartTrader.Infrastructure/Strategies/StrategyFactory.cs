@@ -1,5 +1,5 @@
 ﻿// src/SmartTrader.Infrastructure/Strategies/StrategyFactory.cs
-using Microsoft.Extensions.DependencyInjection; // using جدید
+using Microsoft.Extensions.DependencyInjection;
 using SmartTrader.Application.Interfaces.Strategies;
 using SmartTrader.Domain.Entities;
 using SmartTrader.Infrastructure.Strategies.Entry;
@@ -21,8 +21,10 @@ namespace SmartTrader.Infrastructure.Strategies
         {
             switch (strategy.StrategyName)
             {
-                case "RsiMacdEntry":
+                case "RsiMacdEntryStrategy":
                     return _serviceProvider.GetRequiredService<RsiMacdEntryStrategy>();
+                case "PriceActionEntryStrategy":
+                    return _serviceProvider.GetRequiredService<PriceActionEntryStrategy>();
                 default:
                     throw new NotSupportedException($"Entry Strategy '{strategy.StrategyName}' is not supported.");
             }
@@ -33,7 +35,6 @@ namespace SmartTrader.Infrastructure.Strategies
             switch (strategy.StrategyName)
             {
                 case "TakeProfitStopLossExit":
-                    // استراتژی با تمام وابستگی‌هایش از DI Container گرفته می‌شود
                     return _serviceProvider.GetRequiredService<TakeProfitStopLossExitStrategy>();
                 default:
                     throw new NotSupportedException($"Exit Strategy '{strategy.StrategyName}' is not supported.");

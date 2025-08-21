@@ -30,6 +30,7 @@ Host.CreateDefaultBuilder(args)
         // ثبت کلاس‌های استراتژی به صورت Transient
         services.AddTransient<RsiMacdEntryStrategy>();
         services.AddTransient<TakeProfitStopLossExitStrategy>();
+        services.AddTransient<PriceActionEntryStrategy>(); // ثبت استراتژی جدید
 
     })
     .Build()

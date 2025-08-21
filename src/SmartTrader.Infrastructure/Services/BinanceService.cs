@@ -8,6 +8,11 @@ using SmartTrader.Application.Models;
 using System.Linq;
 using System.Threading.Tasks;
 
+//bingx:seure:   aZWxpP1yCbVVfJNYaIVQxqRZOdQwGJwXpSRJTrOEkmPJIhTZkOCjWMzKq0Zh0unwHfA0CcO4djsouajNctA
+//bingx:api:     PwifrXu8sYfgFw0qnRpUQ0ndrHNlBSbenMG8IYuzayrfqMoYroRTrB77GRAKFHJUYhxQN5nYnZ0GTgKxN4jpUw
+//binance secure: zRYFyQmIKCeNCKhJUIvYX31pTl5fS3LJNhuVHGdzmSoJ9haq1C960DBRbgTAVtpA
+//binance api :   LFoqWEuTZpckOqoMTvVyj0tajAmPtdSAzGd0PpZeCh7P14ZTZHtKwvh0etdQszrL
+
 namespace SmartTrader.Infrastructure.Services
 {
     public class BinanceService : IExchangeService
@@ -61,10 +66,11 @@ namespace SmartTrader.Infrastructure.Services
 
         public async Task<IEnumerable<Kline>> GetKlinesAsync(string symbol)
         {
-            var result = await _client.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, Binance.Net.Enums.KlineInterval.OneHour);
+            //var result = await _client.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.OneHour);
+            var result = await _client.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.OneHour,limit:300);
             if (!result.Success)
             {
-                return Enumerable.Empty<Kline>();
+                return [];
             }
 
             // تبدیل داده‌های بایننس به مدل مستقل ما
@@ -77,6 +83,25 @@ namespace SmartTrader.Infrastructure.Services
                 ClosePrice = k.ClosePrice,
                 Volume = k.Volume
             });
+        }
+
+        public async Task<SymbolFilterInfo> GetSymbolFilterInfoAsync(string symbol)
+        {
+            var exchangeInfo = await _client.UsdFuturesApi.ExchangeData.GetExchangeInfoAsync();
+            if (!exchangeInfo.Success) return null;
+
+            var symbolInfo = exchangeInfo.Data.Symbols.FirstOrDefault(s => s.Name.Equals(symbol, StringComparison.OrdinalIgnoreCase));
+            if (symbolInfo == null) return null;
+
+            var lotSizeFilter = symbolInfo.LotSizeFilter;
+            var priceFilter = symbolInfo.PriceFilter;
+
+            return new SymbolFilterInfo
+            {
+                StepSize = lotSizeFilter?.StepSize ?? 0,
+                MinQuantity = lotSizeFilter?.MinQuantity ?? 0,
+                TickSize = priceFilter?.TickSize ?? 0
+            };
         }
     }
 }

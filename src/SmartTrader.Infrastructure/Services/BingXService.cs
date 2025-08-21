@@ -52,5 +52,12 @@ namespace SmartTrader.Infrastructure.Services
             // TODO: پیاده‌سازی منطق باز کردن پوزیشن در BingX
             throw new NotImplementedException();
         }
+
+        public async Task<SymbolFilterInfo> GetSymbolFilterInfoAsync(string symbol)
+        {
+            _logger.LogInformation("BingX - GetSymbolFilterInfoAsync {symbol}", symbol);
+            // TODO: پیاده‌سازی منطق باز کردن پوزیشن در BingX
+            throw new NotImplementedException();
+        }
     }
 }

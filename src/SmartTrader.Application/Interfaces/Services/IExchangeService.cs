@@ -24,6 +24,6 @@ namespace SmartTrader.Application.Interfaces.Services
         Task<OrderResult> OpenPositionAsync(string symbol, string side, decimal quantity);
         Task<OrderResult> ClosePositionAsync(string symbol, string side, decimal quantity);
         Task<IEnumerable<Kline>> GetKlinesAsync(string symbol); // متد جدید
-
+        Task<SymbolFilterInfo> GetSymbolFilterInfoAsync(string symbol); // متد جدید
     }
 }

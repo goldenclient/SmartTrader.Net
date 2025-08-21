@@ -81,18 +81,34 @@ namespace SmartTrader.WorkerService.Workers
                                         continue; // این ولت برای این کوین پوزیشن باز دارد
                                     }
 
+
                                     // 3. اجرای معامله بر اساس پارامترهای سیگنال
                                     var exchangeService = exchangeFactory.CreateService(wallet, exchange);
+                                    var filterInfo = await exchangeService.GetSymbolFilterInfoAsync(symbol);
+                                    if (filterInfo == null)
+                                    {
+                                        _logger.LogWarning("Could not retrieve symbol filters for {Symbol}. Skipping trade.", symbol);
+                                        continue;
+                                    }
                                     var balance = await exchangeService.GetFreeBalanceAsync();
                                     var positionValue = balance * (signal.PercentBalance ?? 5.0m) / 100;
                                     var lastPrice = await exchangeService.GetLastPriceAsync(symbol);
                                     if (lastPrice == 0) continue;
 
-                                    var quantity = positionValue / lastPrice;
-                                    // TODO: رند کردن مقدار quantity بر اساس lot size
+                                    var initialQuantity = positionValue / lastPrice;
+
+                                    // 3. اعتبارسنجی و تنظیم حجم معامله بر اساس قوانین صرافی
+                                    if (initialQuantity < filterInfo.MinQuantity)
+                                    {
+                                        _logger.LogWarning("Calculated quantity {Quantity} is less than MinQuantity {MinQuantity} for {Symbol}. Skipping trade.", initialQuantity, filterInfo.MinQuantity, symbol);
+                                        continue;
+                                    }
+
+                                    var adjustedQuantity = AdjustToStepSize(initialQuantity, filterInfo.StepSize);
+
 
                                     var positionSide = signal.Signal == SignalType.OpenLong ? "LONG" : "SHORT";
-                                    var openResult = await exchangeService.OpenPositionAsync(symbol, positionSide, quantity);
+                                    var openResult = await exchangeService.OpenPositionAsync(symbol, positionSide, adjustedQuantity);
 
                                     if (openResult.IsSuccess)
                                     {
@@ -129,5 +145,17 @@ namespace SmartTrader.WorkerService.Workers
                 await Task.Delay(TimeSpan.FromMinutes(_intervalMinutes), stoppingToken);
             }
         }
+
+        private decimal AdjustToStepSize(decimal quantity, decimal stepSize)
+        {
+            if (stepSize == 0)
+            {
+                return quantity;
+            }
+            // تعداد گام‌ها را محاسبه کرده و به پایین گرد می‌کنیم، سپس در اندازه گام ضرب می‌کنیم
+            // این کار تضمین می‌کند که مقدار نهایی مضربی از stepSize و کوچکتر یا مساوی مقدار اولیه است
+            return Math.Floor(quantity / stepSize) * stepSize;
+        }
+
     }
 }
