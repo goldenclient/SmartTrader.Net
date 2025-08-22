@@ -7,7 +7,7 @@ namespace SmartTrader.Application.Interfaces.Strategies
 {
     public interface IEntryStrategyHandler
     {
-        // استراتژی سیگنال را برای یک کوین خاص در یک صرافی مشخص تولید می‌کند
-        Task<StrategySignal> GetSignalAsync(Coin coin, string exchangeName);
+        // آبجکت Strategy به عنوان پارامتر اضافه شد
+        Task<StrategySignal> GetSignalAsync(Coin coin, Strategy strategy, string exchangeName);
     }
 }

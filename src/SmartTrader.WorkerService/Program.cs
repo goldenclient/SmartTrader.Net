@@ -18,6 +18,8 @@ Host.CreateDefaultBuilder(args)
         services.AddScoped<IPositionRepository, PositionRepository>();
         services.AddScoped<IExchangeRepository, ExchangeRepository>(); // ریپازیتوری جدید
         services.AddScoped<ICoinRepository, CoinRepository>(); // ثبت ریپازیتوری جدید
+        
+        services.AddScoped<ITelegramNotifier, TelegramNotifier>();
 
         // ثبت Factory ها
         services.AddScoped<IExchangeServiceFactory, ExchangeServiceFactory>();
@@ -28,7 +30,7 @@ Host.CreateDefaultBuilder(args)
         services.AddHostedService<ClosePositionWorker>();
 
         // ثبت کلاس‌های استراتژی به صورت Transient
-        services.AddTransient<RsiMacdEntryStrategy>();
+        services.AddTransient<RsiVolumeEntryStrategy>();
         services.AddTransient<TakeProfitStopLossExitStrategy>();
         services.AddTransient<PriceActionEntryStrategy>(); // ثبت استراتژی جدید
 

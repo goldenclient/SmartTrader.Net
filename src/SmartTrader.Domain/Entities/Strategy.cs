@@ -8,5 +8,10 @@ namespace SmartTrader.Domain.Entities
         public bool IsEntryStrategy { get; set; }
         public string? Description { get; set; }
         public bool IsActive { get; set; }
+        public decimal? PercentBalance { get; set; }
+        public decimal? StopLoss { get; set; }
+        public decimal? TakeProfit { get; set; }
+        public int? Leverage { get; set; }
+
     }
 }

@@ -43,6 +43,7 @@ namespace SmartTrader.WorkerService.Workers
                     var wallets = await walletRepo.GetActiveWalletsAsync();
                     var exchanges = (await exchangeRepo.GetAllAsync()).ToDictionary(e => e.ExchangeID);
                     var allCoins = (await coinRepo.GetAllAsync()).ToDictionary(c => c.CoinID);
+                    var telegramNotifier = scope.ServiceProvider.GetRequiredService<ITelegramNotifier>(); // Resolve سرویس جدید
 
                     foreach (var strategy in entryStrategies)
                     {
@@ -57,12 +58,14 @@ namespace SmartTrader.WorkerService.Workers
                             string signalExchange = "binance";
 
                             // 1. دریافت سیگنال یک بار برای هر کوین
-                            var signal = await strategyHandler.GetSignalAsync(coin, signalExchange);
+                            var signal = await strategyHandler.GetSignalAsync(coin, strategy, signalExchange);
 
                             // 2. اگر سیگنالی وجود داشت، آن را روی تمام ولت‌های واجد شرایط اعمال کن
                             if (signal.Signal == SignalType.OpenLong || signal.Signal == SignalType.OpenShort)
                             {
                                 _logger.LogInformation("Signal {Signal} for {CoinName} received. Applying to eligible wallets.", signal.Signal, coin.CoinName);
+
+                                await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName);
 
                                 foreach (var wallet in wallets)
                                 {

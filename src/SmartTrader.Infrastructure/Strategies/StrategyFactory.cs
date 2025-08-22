@@ -21,8 +21,8 @@ namespace SmartTrader.Infrastructure.Strategies
         {
             switch (strategy.StrategyName)
             {
-                case "RsiMacdEntryStrategy":
-                    return _serviceProvider.GetRequiredService<RsiMacdEntryStrategy>();
+                case "RsiVolumeEntryStrategy":
+                    return _serviceProvider.GetRequiredService<RsiVolumeEntryStrategy>();
                 case "PriceActionEntryStrategy":
                     return _serviceProvider.GetRequiredService<PriceActionEntryStrategy>();
                 default:
