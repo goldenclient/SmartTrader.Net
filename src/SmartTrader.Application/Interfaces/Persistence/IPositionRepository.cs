@@ -11,5 +11,7 @@ namespace SmartTrader.Application.Interfaces.Persistence
         Task<Position> CreateAsync(Position position);
         Task UpdateAsync(Position position);
         Task<IEnumerable<Position>> GetOpenPositionsAsync();
+        Task<IEnumerable<PositionHistory>> GetHistoryByPositionIdAsync(int positionId);
+        Task AddHistoryAsync(PositionHistory history);
     }
 }

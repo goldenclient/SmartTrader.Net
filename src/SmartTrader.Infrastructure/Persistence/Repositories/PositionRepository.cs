@@ -55,5 +55,22 @@ namespace SmartTrader.Infrastructure.Persistence.Repositories
             using var connection = CreateConnection();
             await connection.ExecuteAsync(sql, position);
         }
+
+        // src/SmartTrader.Infrastructure/Persistence/Repositories/PositionRepository.cs
+        public async Task<IEnumerable<PositionHistory>> GetHistoryByPositionIdAsync(int positionId)
+        {
+            const string sql = "SELECT * FROM PositionHistory WHERE PositionID = @PositionID ORDER BY ActionTimestamp";
+            using var connection = CreateConnection();
+            return await connection.QueryAsync<PositionHistory>(sql, new { PositionID = positionId });
+        }
+
+        public async Task AddHistoryAsync(PositionHistory history)
+        {
+            const string sql = @"
+        INSERT INTO PositionHistory (PositionID, ActionType, PercentPosition, PercentBalance, Price, ActionTimestamp, Description)
+        VALUES (@PositionID, @ActionType, @Price, @ActionTimestamp, @Description);";
+            using var connection = CreateConnection();
+            await connection.ExecuteAsync(sql, history);
+        }
     }
 }

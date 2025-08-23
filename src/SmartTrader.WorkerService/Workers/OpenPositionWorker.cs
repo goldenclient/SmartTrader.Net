@@ -63,10 +63,10 @@ namespace SmartTrader.WorkerService.Workers
                             // 2. اگر سیگنالی وجود داشت، آن را روی تمام ولت‌های واجد شرایط اعمال کن
                             if (signal.Signal == SignalType.OpenLong || signal.Signal == SignalType.OpenShort)
                             {
-                                _logger.LogInformation("Signal {Signal} for {CoinName} received. Applying to eligible wallets.", signal.Signal, coin.CoinName);
+                                _logger.LogInformation("Signal {Signal} for {CoinName} received. Notifying and applying to eligible wallets.", signal.Signal, coin.CoinName);
 
                                 await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName);
-
+                                //continue;
                                 foreach (var wallet in wallets)
                                 {
                                     if (!exchanges.TryGetValue(wallet.ExchangeID, out var exchange) ||
@@ -147,7 +147,7 @@ namespace SmartTrader.WorkerService.Workers
             }
         }
 
-        private decimal AdjustToStepSize(decimal quantity, decimal stepSize)
+        private static decimal AdjustToStepSize(decimal quantity, decimal stepSize)
         {
             if (stepSize == 0)
             {

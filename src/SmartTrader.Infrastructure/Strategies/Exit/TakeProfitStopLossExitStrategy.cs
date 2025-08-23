@@ -5,6 +5,7 @@ using SmartTrader.Application.Interfaces.Services;
 using SmartTrader.Application.Interfaces.Strategies;
 using SmartTrader.Application.Models;
 using SmartTrader.Domain.Entities;
+using SmartTrader.Domain.Enums;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -61,11 +62,11 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
 
             if (pnlPercentage * 100 >= takeProfitPercent)
             {
-                return new StrategySignal { Signal = SignalType.Close, Reason = "Take Profit reached." };
+                return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "Take Profit reached." };
             }
             if (pnlPercentage * 100 <= -stopLossPercent)
             {
-                return new StrategySignal { Signal = SignalType.Close, Reason = "Stop Loss reached." };
+                return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "Stop Loss reached." };
             }
 
             return new StrategySignal();

@@ -5,6 +5,7 @@ using SmartTrader.Application.Interfaces.Services;
 using SmartTrader.Application.Interfaces.Strategies;
 using SmartTrader.Application.Models;
 using SmartTrader.Domain.Entities;
+using SmartTrader.Domain.Enums;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -28,7 +29,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             var exchangeInfo = coin.GetExchangeInfo().FirstOrDefault(e => e.Exchange.Equals(exchangeName, StringComparison.OrdinalIgnoreCase));
             if (exchangeInfo == null) return new StrategySignal { Reason = "Symbol not found." };
 
-            var marketDataService = _exchangeFactory.CreateService(new Wallet { ApiKey = "", SecretKey = "" }, new Exchange { ExchangeName = exchangeName });
+            var marketDataService = _exchangeFactory.CreateService(new Wallet { ApiKey = "LFoqWEuTZpckOqoMTvVyj0tajAmPtdSAzGd0PpZeCh7P14ZTZHtKwvh0etdQszrL", SecretKey = "zRYFyQmIKCeNCKhJUIvYX31pTl5fS3LJNhuVHGdzmSoJ9haq1C960DBRbgTAVtpA" }, new Exchange { ExchangeName = exchangeName });
 
             // فرض بر این است که GetKlinesAsync داده‌های تایم فریم یک ساعته را برمی‌گرداند
             var klines = (await marketDataService.GetKlinesAsync(exchangeInfo.Symbol)).ToList();

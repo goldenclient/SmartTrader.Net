@@ -5,6 +5,7 @@ using CryptoExchange.Net.Authentication;
 using Microsoft.Extensions.Logging;
 using SmartTrader.Application.Interfaces.Services;
 using SmartTrader.Application.Models;
+using SmartTrader.Domain.Enums;
 using System.Linq;
 using System.Threading.Tasks;
 

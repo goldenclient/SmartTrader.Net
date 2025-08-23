@@ -5,6 +5,7 @@ using SmartTrader.Application.Interfaces.Services;
 using SmartTrader.Application.Interfaces.Strategies;
 using SmartTrader.Application.Models;
 using SmartTrader.Domain.Entities;
+using SmartTrader.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
