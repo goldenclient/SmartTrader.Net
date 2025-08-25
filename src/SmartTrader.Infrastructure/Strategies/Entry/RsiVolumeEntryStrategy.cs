@@ -1,4 +1,5 @@
 ﻿// src/SmartTrader.Infrastructure/Strategies/Entry/RsiVolumeEntryStrategy.cs
+using Binance.Net.Enums;
 using Microsoft.Extensions.Logging;
 using Skender.Stock.Indicators;
 using SmartTrader.Application.Interfaces.Services;
@@ -26,16 +27,29 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
 
         public async Task<StrategySignal> GetSignalAsync(Coin coin, Strategy strategy, string exchangeName)
         {
-            var exchangeInfo = coin.GetExchangeInfo().FirstOrDefault(e => e.Exchange.Equals(exchangeName, StringComparison.OrdinalIgnoreCase));
-            if (exchangeInfo == null) return new StrategySignal { Reason = "Symbol not found." };
+            var exchangeInfo = coin.GetExchangeInfo()
+                .FirstOrDefault(e => e.Exchange.Equals(exchangeName, StringComparison.OrdinalIgnoreCase));
+            if (exchangeInfo == null)
+                return new StrategySignal { Reason = "Symbol not found." };
 
-            var marketDataService = _exchangeFactory.CreateService(new Wallet { ApiKey = "LFoqWEuTZpckOqoMTvVyj0tajAmPtdSAzGd0PpZeCh7P14ZTZHtKwvh0etdQszrL", SecretKey = "zRYFyQmIKCeNCKhJUIvYX31pTl5fS3LJNhuVHGdzmSoJ9haq1C960DBRbgTAVtpA" }, new Exchange { ExchangeName = exchangeName });
+            var marketDataService = _exchangeFactory.CreateService(
+                new Wallet { ApiKey = "LFoqWEuTZpckOqoMTvVyj0tajAmPtdSAzGd0PpZeCh7P14ZTZHtKwvh0etdQszrL", SecretKey = "zRYFyQmIKCeNCKhJUIvYX31pTl5fS3LJNhuVHGdzmSoJ9haq1C960DBRbgTAVtpA" },
+                new Exchange { ExchangeName = exchangeName });
 
-            // فرض بر این است که GetKlinesAsync داده‌های تایم فریم یک ساعته را برمی‌گرداند
-            var klines = (await marketDataService.GetKlinesAsync(exchangeInfo.Symbol)).ToList();
+            // ---- پارامترها (از Strategy اگر بود؛ وگرنه پیش‌فرض) ----
+            int emaFast = 20;
+            int emaSlow = 50;
+            int rsiLen = 14;
+            int atrLen = 14;
+            decimal atrMult = 1.5m;
 
-            // برای مقایسه دو مقدار آخر RSI، حداقل به RsiLookbackPeriod + 1 کندل نیاز داریم
-            if (klines.Count < RsiLookbackPeriod + 1) return new StrategySignal { Reason = "Not enough kline data." };
+            // ---- دیتای کندل 15 دقیقه ----
+            var klines = (await marketDataService.GetKlinesAsync(exchangeInfo.Symbol, strategy.TimeFrame?.ToString() ?? TimeFrame.FifteenMinute.ToString(),300)).ToList();
+
+            // حداقل تعداد برای اینکه آخرین مقدارهای EMA50/RSI/ATR نال نباشند
+            int warmup = Math.Max(Math.Max(emaSlow, rsiLen), atrLen) + 1;
+            if (klines.Count < warmup)
+                return new StrategySignal { Reason = "Not enough kline data." };
 
             var quotes = klines.Select(k => new Quote
             {
@@ -45,52 +59,61 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
                 Low = k.LowPrice,
                 Close = k.ClosePrice,
                 Volume = k.Volume
-            });
+            }).ToList();
 
-            // --- محاسبه RSI ---
-            var rsiResults = quotes.GetRsi(RsiLookbackPeriod).ToList();
-            if (rsiResults.Count < 2) return new StrategySignal { Reason = "Could not calculate the last two RSI values." };
+            // ---- محاسبه اندیکاتورها ----
+            var ema20 = quotes.GetEma(emaFast).ToList();
+            var ema50 = quotes.GetEma(emaSlow).ToList();
+            var rsi = quotes.GetRsi(rsiLen).ToList();
+            var atr = quotes.GetAtr(atrLen).ToList();
 
-            var lastRsi = rsiResults.Last();
-            var previousRsi = rsiResults[rsiResults.Count - 2];
+            // آخرین کندل بسته‌شده
+            int i = quotes.Count - 1;
 
-            // --- دریافت حجم معاملات ---
-            var lastVolume = quotes.Last().Volume;
-            var previousVolume = quotes.ElementAt(quotes.Count() - 2).Volume;
+            decimal lastClose = (decimal)quotes[i].Close;
+            decimal lastEma20 = ema20[i].Ema.HasValue ? (decimal)ema20[i].Ema.Value : 0m;
+            decimal lastEma50 = ema50[i].Ema.HasValue ? (decimal)ema50[i].Ema.Value : 0m;
+            decimal lastRsi = rsi[i].Rsi.HasValue ? (decimal)rsi[i].Rsi.Value : 50m;
+            decimal lastAtr = atr[i].Atr.HasValue ? (decimal)atr[i].Atr.Value : 0m;
 
-            // --- بررسی شروط سیگنال Long ---
-            if (lastRsi.Rsi < 30 && lastRsi.Rsi > previousRsi.Rsi && lastVolume > previousVolume)
+            if (lastEma20 == 0m || lastEma50 == 0m || lastAtr <= 0m)
+                return new StrategySignal { Reason = "Indicator values not ready." };
+
+            // حد ضرر به‌صورت فاصله‌ی قیمتی = ATR * 1.5
+            decimal stopDistance = lastAtr * atrMult;
+
+            // برای همخوانی با مدل فعلی، StopLoss را درصدی از قیمت بفرستیم:
+            decimal stopLossPercent = (stopDistance / lastClose) * 100m;
+
+            // ---- ورود لانگ: EMA20>EMA50 و RSI>40 ----
+            if (lastEma20 > lastEma50 && lastRsi > 40m)
             {
-                _logger.LogInformation("RSI Volume Long Signal found for {Symbol}", exchangeInfo.Symbol);
+                _logger.LogInformation("LONG signal (EMA+RSI+ATR) for {Symbol}", exchangeInfo.Symbol);
                 return new StrategySignal
                 {
                     Signal = SignalType.OpenLong,
-                    Reason = $"RSI({lastRsi.Rsi:F2}) < 30 and rising, with increasing volume.",
-                    // مقادیر از آبجکت استراتژی خوانده می‌شوند
-                    PercentBalance = strategy.PercentBalance ?? 5m, // یک مقدار پیش‌فرض در صورت null بودن
-                    StopLoss = strategy.StopLoss ?? 5m,
-                    TakeProfit = strategy.TakeProfit ?? 5m,
-                    Leverage = strategy.Leverage ?? 5
+                    Reason = $"EMA20({lastEma20:F2})>EMA50({lastEma50:F2}), RSI={lastRsi:F2}>40, ATR={lastAtr:F2}, SL≈{stopLossPercent:F2}%",
+                    PercentBalance = strategy?.PercentBalance ?? 2m,
+                    StopLoss = stopLossPercent,     // درصدی
+                    Leverage = strategy?.Leverage ?? 3,
                 };
             }
 
-            // --- بررسی شروط سیگنال Short ---
-            if (lastRsi.Rsi > 70 && lastRsi.Rsi < previousRsi.Rsi && lastVolume > previousVolume)
+            // ---- ورود شورت: EMA20<EMA50 و RSI<60 ----
+            if (lastEma20 < lastEma50 && lastRsi < 60m)
             {
-                _logger.LogInformation("RSI Volume Short Signal found for {Symbol}", exchangeInfo.Symbol);
+                _logger.LogInformation("SHORT signal (EMA+RSI+ATR) for {Symbol}", exchangeInfo.Symbol);
                 return new StrategySignal
                 {
                     Signal = SignalType.OpenShort,
-                    Reason = $"RSI({lastRsi.Rsi:F2}) > 70 and falling, with increasing volume.",
-                    // مقادیر از آبجکت استراتژی خوانده می‌شوند
-                    PercentBalance = strategy.PercentBalance ?? 5m,
-                    StopLoss = strategy.StopLoss ?? 5m,
-                    TakeProfit = strategy.TakeProfit ?? 5m,
-                    Leverage = strategy.Leverage ?? 5
+                    Reason = $"EMA20({lastEma20:F2})<EMA50({lastEma50:F2}), RSI={lastRsi:F2}<60, ATR={lastAtr:F2}, SL≈{stopLossPercent:F2}%",
+                    PercentBalance = strategy?.PercentBalance ?? 2m,
+                    StopLoss = stopLossPercent,     // درصدی
+                    Leverage = strategy?.Leverage ?? 3
                 };
             }
 
-            return new StrategySignal();
+            return new StrategySignal { Reason = "No entry condition met." };
         }
     }
 }

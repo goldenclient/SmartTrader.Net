@@ -8,7 +8,7 @@ namespace SmartTrader.Domain.Entities
     {
         public long PositionHistoryID { get; set; }
         public int PositionID { get; set; }
-        public ActionType ActionType { get; set; }
+        public SignalType ActionType { get; set; }
         public decimal? PercentPosition { get; set; }
         public decimal? PercentBalance { get; set; }
         public decimal Price { get; set; }

@@ -46,7 +46,7 @@ namespace SmartTrader.Infrastructure.Services
             throw new NotImplementedException();
         }
 
-        public Task<IEnumerable<Kline>> GetKlinesAsync(string symbol)
+        public Task<IEnumerable<Kline>> GetKlinesAsync(string symbol, string timeframe,int limit)
         {
             _logger.LogInformation("BingX - Opening position for {symbol}", symbol);
             // TODO: پیاده‌سازی منطق باز کردن پوزیشن در BingX
@@ -54,6 +54,19 @@ namespace SmartTrader.Infrastructure.Services
         }
 
         public async Task<SymbolFilterInfo> GetSymbolFilterInfoAsync(string symbol)
+        {
+            _logger.LogInformation("BingX - GetSymbolFilterInfoAsync {symbol}", symbol);
+            // TODO: پیاده‌سازی منطق باز کردن پوزیشن در BingX
+            throw new NotImplementedException();
+        }
+        public async Task<OrderResult> ModifyPositionAsync(string symbol, string side, decimal quantity)
+        {
+            _logger.LogInformation("BingX - GetSymbolFilterInfoAsync {symbol}", symbol);
+            // TODO: پیاده‌سازی منطق باز کردن پوزیشن در BingX
+            throw new NotImplementedException();
+        }
+
+        public async Task<bool> UpdateStopLossAsync(string symbol, string positionSide, decimal stopPrice)
         {
             _logger.LogInformation("BingX - GetSymbolFilterInfoAsync {symbol}", symbol);
             // TODO: پیاده‌سازی منطق باز کردن پوزیشن در BingX

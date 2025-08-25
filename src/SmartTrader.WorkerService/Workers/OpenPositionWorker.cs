@@ -65,7 +65,6 @@ namespace SmartTrader.WorkerService.Workers
                             {
                                 _logger.LogInformation("Signal {Signal} for {CoinName} received. Notifying and applying to eligible wallets.", signal.Signal, coin.CoinName);
 
-                                await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName);
                                 //continue;
                                 foreach (var wallet in wallets)
                                 {
@@ -113,6 +112,7 @@ namespace SmartTrader.WorkerService.Workers
                                     var openResult = await exchangeService.OpenPositionAsync(signal);
                                     if (openResult.IsSuccess)
                                     {
+                                        await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName,wallet.WalletName, lastPrice);
                                         // انتخاب استراتژی خروج
                                         int? exitStrategyId = wallet.ForceExitStrategyID ?? defaultExitStrategy?.StrategyID;
                                         if (!exitStrategyId.HasValue)
@@ -131,11 +131,15 @@ namespace SmartTrader.WorkerService.Workers
                                             EntryPrice = openResult.AveragePrice,
                                             EntryValueUSD = positionValue,
                                             CurrentQuantity = openResult.Quantity,
-                                            OpenTimestamp = DateTime.UtcNow
+                                            OpenTimestamp = DateTime.UtcNow,
+                                            Stoploss = signal.StopLoss,
+                                            TakeProfit = signal.TakeProfit,
                                         };
                                         await positionRepo.CreateAsync(newPosition);
                                         _logger.LogInformation("Position for {Symbol} on wallet {WalletName} opened.", symbol, wallet.WalletName);
                                     }
+                                    else
+                                        _logger.LogInformation("Position for {Symbol} on wallet {WalletName} Error:{WalletName}", symbol, wallet.WalletName,openResult.ErrorMessage);
                                 }
                             }
                         }

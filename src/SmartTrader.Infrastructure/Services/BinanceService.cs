@@ -5,6 +5,7 @@ using CryptoExchange.Net.Authentication;
 using Microsoft.Extensions.Logging;
 using SmartTrader.Application.Interfaces.Services;
 using SmartTrader.Application.Models;
+using SmartTrader.Domain.Entities;
 using SmartTrader.Domain.Enums;
 using System.Linq;
 using System.Threading.Tasks;
@@ -93,10 +94,29 @@ namespace SmartTrader.Infrastructure.Services
                 : new OrderResult { IsSuccess = false, ErrorMessage = result.Error?.Message };
         }
 
-        public async Task<IEnumerable<Kline>> GetKlinesAsync(string symbol)
+        public async Task<IEnumerable<Kline>> GetKlinesAsync(string symbol,string timeframe, int limit)
         {
-            //var result = await _client.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.OneHour);
-            var result = await _client.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.OneHour,limit:300);
+            var tm = KlineInterval.FifteenMinutes;
+            switch (timeframe)
+            {
+                case "5":
+                    tm= KlineInterval.FiveMinutes;
+                    break;
+                case "30":
+                    tm = KlineInterval.ThirtyMinutes;
+                    break;
+                case "60":
+                    tm = KlineInterval.OneHour;
+                    break;
+                case "240":
+                    tm = KlineInterval.FourHour;
+                    break;
+                default:
+                    tm = KlineInterval.FifteenMinutes;
+                    break;
+            }
+
+            var result = await _client.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, tm,limit:limit);
             if (!result.Success)
             {
                 return [];
@@ -131,6 +151,56 @@ namespace SmartTrader.Infrastructure.Services
                 MinQuantity = lotSizeFilter?.MinQuantity ?? 0,
                 TickSize = priceFilter?.TickSize ?? 0
             };
+        }
+
+        // src/SmartTrader.Infrastructure/Services/BinanceService.cs
+        public async Task<OrderResult> ModifyPositionAsync(string symbol, string side, decimal quantity)
+        {
+            var orderSide = side.ToUpper() == "BUY" ? OrderSide.Buy : OrderSide.Sell;
+            // هنگام فروش بخشی، سفارش باید از نوع reduceOnly باشد
+            // هنگام خرید مجدد، سفارش از نوع عادی است
+            bool reduceOnly = orderSide == OrderSide.Sell;
+
+            var result = await _client.UsdFuturesApi.Trading.PlaceOrderAsync(symbol, orderSide, FuturesOrderType.Market, quantity, reduceOnly: reduceOnly);
+
+            return result.Success
+                ? new OrderResult { IsSuccess = true, OrderId = result.Data.Id, AveragePrice = result.Data.AveragePrice, Quantity = result.Data.Quantity }
+                : new OrderResult { IsSuccess = false, ErrorMessage = result.Error?.Message };
+        }
+
+        public async Task<bool> UpdateStopLossAsync(string symbol, string positionSide, decimal stopPrice)
+        {
+            // ابتدا تمام سفارش‌های باز (از جمله SL/TP قبلی) را لغو می‌کنیم
+            var cancelResult = await _client.UsdFuturesApi.Trading.CancelAllOrdersAsync(symbol);
+            if (!cancelResult.Success)
+            {
+                _logger.LogWarning("Could not cancel existing orders for {symbol} before placing new SL. It might proceed anyway.", symbol);
+            }
+
+            // برای تنظیم حد ضرر، یک سفارش STOP_MARKET در جهت مخالف پوزیشن ثبت می‌کنیم
+            var orderSide = positionSide.ToUpper() == "LONG" ? OrderSide.Sell : OrderSide.Buy;
+
+            var result = await _client.UsdFuturesApi.Trading.PlaceOrderAsync(
+                symbol,
+                orderSide,
+                FuturesOrderType.StopMarket,
+                quantity: null, // مقدار لازم نیست چون کل پوزیشن بسته می‌شود
+                positionSide: null,
+                timeInForce: null,
+                reduceOnly: true, // این پارامتر برای سفارش‌های SL/TP ضروری است
+                price: null,
+                stopPrice: stopPrice, // قیمت فعال‌سازی حد ضرر
+                closePosition: true // تضمین می‌کند که کل پوزیشن بسته شود
+            );
+
+            if (!result.Success)
+            {
+                _logger.LogError("Failed to place Stop Loss order for {symbol}: {error}", symbol, result.Error?.Message);
+                return false;
+            }
+
+            _logger.LogInformation("Successfully placed new Stop Loss order for {symbol} at {price}", symbol, stopPrice);
+            return true;
         }
     }
 }

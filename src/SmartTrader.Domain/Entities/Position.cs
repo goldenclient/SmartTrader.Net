@@ -16,6 +16,8 @@ namespace SmartTrader.Domain.Entities
         public int CoinID { get; set; }
         public int EntryStrategyID { get; set; }
         public int? ExitStrategyID { get; set; }
+        public decimal? Stoploss { get; set; }
+        public decimal? TakeProfit { get; set; }
         public string Symbol { get; set; }
         public string PositionSide { get; set; }
         public PositionStatus Status { get; set; } // از Enum استفاده می‌شود

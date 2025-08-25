@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using SmartTrader.Application.Interfaces.Services;
 using SmartTrader.Application.Models;
+using SmartTrader.Domain.Entities;
 using System;
 using System.Net.Http;
 using System.Text;
@@ -25,7 +26,7 @@ namespace SmartTrader.Infrastructure.Services
             _channelId = configuration["TelegramSettings:ChannelId"];
         }
 
-        public async Task SendNotificationAsync(StrategySignal signal, string coinName, string strategyName)
+        public async Task SendNotificationAsync(StrategySignal signal, string coinName, string strategyName,string walletName,decimal price)
         {
             if (string.IsNullOrEmpty(_botToken) || string.IsNullOrEmpty(_channelId))
             {
@@ -35,8 +36,10 @@ namespace SmartTrader.Infrastructure.Services
 
             var messageBuilder = new StringBuilder();
             messageBuilder.AppendLine($"🚨 **New Trading Signal** 🚨");
+            messageBuilder.AppendLine($"**WalletName:** `{walletName}`");
             messageBuilder.AppendLine($"**Strategy:** `{strategyName}`");
             messageBuilder.AppendLine($"**Coin:** `{coinName}`");
+            messageBuilder.AppendLine($"**Price:** `{price}`");
             messageBuilder.AppendLine($"**Signal:** `{signal.Signal}`");
             messageBuilder.AppendLine($"**Reason:** {signal.Reason}");
             messageBuilder.AppendLine($"");
@@ -67,5 +70,44 @@ namespace SmartTrader.Infrastructure.Services
                 _logger.LogError(ex, "An error occurred while sending Telegram notification.");
             }
         }
+
+        public async Task SendNotificationCloseAsync(StrategySignal signal, string walletName,decimal actionPrice)
+        {
+            if (string.IsNullOrEmpty(_botToken) || string.IsNullOrEmpty(_channelId))
+            {
+                _logger.LogWarning("Telegram BotToken or ChannelId is not configured. Skipping notification.");
+                return;
+            }
+
+            var messageBuilder = new StringBuilder();
+            messageBuilder.AppendLine($"🚨 **Action Position** 🚨");
+            messageBuilder.AppendLine($"**WalletName:** `{walletName}`");
+            messageBuilder.AppendLine($"**Symbol:** `{signal.Symbol}`");
+            messageBuilder.AppendLine($"**Price:** `{actionPrice}`");
+            messageBuilder.AppendLine($"**Percent %:** `{signal.PartialPercent}`");
+            messageBuilder.AppendLine($"**Reason:** `{signal.Reason}`");
+
+            var message = messageBuilder.ToString();
+            var url = $"https://api.telegram.org/bot{_botToken}/sendMessage?chat_id={_channelId}&text={Uri.EscapeDataString(message)}&parse_mode=Markdown";
+
+            try
+            {
+                var response = await _httpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("Successfully sent notification to Telegram channel {ChannelId}", _channelId);
+                }
+                else
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("Failed to send Telegram notification. Status: {StatusCode}, Response: {Response}", response.StatusCode, responseContent);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while sending Telegram notification.");
+            }
+        }
+
     }
 }

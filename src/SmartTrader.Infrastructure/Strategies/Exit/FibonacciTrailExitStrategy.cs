@@ -63,26 +63,26 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
                 return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "Stop Loss target reached." };
 
             var trailSlTarget = position.EntryPrice + (totalTargetRange * 0.89m);
-            if (currentPrice >= trailSlTarget && !positionHistory.Any(h => h.ActionType == ActionType.ChangeSL))
+            if (currentPrice >= trailSlTarget && !positionHistory.Any(h => h.ActionType == SignalType.ChangeSL))
             {
                 var newSlPrice = slTargetPrice * 1.144m;
                 return new StrategySignal { Signal = SignalType.ChangeSL, NewStopLossPrice = newSlPrice, Reason = "Trailing Stop Loss triggered." };
             }
 
             var partialSellTarget = position.EntryPrice + (totalTargetRange * 0.34m);
-            if (currentPrice >= partialSellTarget && !positionHistory.Any(h => h.ActionType == ActionType.SellProfit))
+            if (currentPrice >= partialSellTarget && !positionHistory.Any(h => h.ActionType == SignalType.SellProfit))
             {
                 return new StrategySignal { Signal = SignalType.SellProfit, PercentPosition = 21, Reason = "Partial profit taken (21%)." };
             }
 
-            bool hasSoldPartial = positionHistory.Any(h => h.ActionType == ActionType.SellProfit);
-            if (currentPrice <= position.EntryPrice && hasSoldPartial && !positionHistory.Any(h => h.ActionType == ActionType.BuyRollback && h.Price <= position.EntryPrice))
+            bool hasSoldPartial = positionHistory.Any(h => h.ActionType == SignalType.SellProfit);
+            if (currentPrice <= position.EntryPrice && hasSoldPartial && !positionHistory.Any(h => h.ActionType == SignalType.BuyRollback && h.Price <= position.EntryPrice))
             {
                 return new StrategySignal { Signal = SignalType.BuyRollback, PercentBalance = 13, Reason = "Re-buy at entry point (13%)." };
             }
 
             var deepBuyTarget = position.EntryPrice * 0.99m;
-            if (currentPrice <= deepBuyTarget && !positionHistory.Any(h => h.ActionType == ActionType.BuyRollback && h.Price <= deepBuyTarget))
+            if (currentPrice <= deepBuyTarget && !positionHistory.Any(h => h.ActionType == SignalType.BuyRollback && h.Price <= deepBuyTarget))
             {
                 return new StrategySignal { Signal = SignalType.BuyRollback, PercentBalance = 55, Reason = "Re-buy on dip (55%)." };
             }

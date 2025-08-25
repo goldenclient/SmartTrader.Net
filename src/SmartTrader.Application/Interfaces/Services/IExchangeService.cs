@@ -2,7 +2,8 @@
 using SmartTrader.Domain.Entities;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using SmartTrader.Application.Models; // این using را اضافه کنید
+using SmartTrader.Application.Models;
+using SmartTrader.Domain.Enums; // این using را اضافه کنید
 
 namespace SmartTrader.Application.Interfaces.Services
 {
@@ -23,7 +24,9 @@ namespace SmartTrader.Application.Interfaces.Services
         Task<decimal> GetLastPriceAsync(string symbol);
         Task<OrderResult> OpenPositionAsync(StrategySignal signal);
         Task<OrderResult> ClosePositionAsync(string symbol, string side, decimal quantity);
-        Task<IEnumerable<Kline>> GetKlinesAsync(string symbol); // متد جدید
+        Task<IEnumerable<Kline>> GetKlinesAsync(string symbol,string timeframe,int limit); // متد جدید
         Task<SymbolFilterInfo> GetSymbolFilterInfoAsync(string symbol); // متد جدید
+        Task<OrderResult> ModifyPositionAsync(string symbol, string side, decimal quantity); // متد جدید
+        Task<bool> UpdateStopLossAsync(string symbol, string positionSide, decimal stopPrice); // متد جدید
     }
 }

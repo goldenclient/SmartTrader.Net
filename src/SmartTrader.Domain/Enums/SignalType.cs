@@ -11,6 +11,9 @@ namespace SmartTrader.Domain.Enums
         CloseByTP,      // بستن پوزیشن با حد سود
         CloseBySL,      // بستن پوزیشن با حد ضرر
         ChangeSL,       // تغییر حد ضرر
-        ChangeTP        // تغییر حد سود
+        ChangeTP,        // تغییر حد سود
+        PartialClose1,
+        PartialClose2,
+        PartialClose,
     }
 }

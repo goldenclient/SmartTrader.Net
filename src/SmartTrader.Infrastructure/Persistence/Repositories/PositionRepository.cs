@@ -72,5 +72,6 @@ namespace SmartTrader.Infrastructure.Persistence.Repositories
             using var connection = CreateConnection();
             await connection.ExecuteAsync(sql, history);
         }
+
     }
 }

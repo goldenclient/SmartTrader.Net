@@ -16,6 +16,7 @@ namespace SmartTrader.Application.Models
         public int? Leverage { get; set; }
         public string Symbol { get; set; }
         public decimal Quantity { get; set; }
+        public int? PartialPercent { get; set; }
 
         // پارامترهای استراتژی خروج
         public decimal? PercentPosition { get; set; }

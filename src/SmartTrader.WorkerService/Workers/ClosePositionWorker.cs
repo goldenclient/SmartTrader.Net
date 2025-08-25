@@ -1,10 +1,11 @@
-﻿// src/SmartTrader.WorkerService/Workers/ClosePositionWorker.cs
+﻿using Microsoft.Extensions.Logging;
 using SmartTrader.Application.Interfaces.Persistence;
 using SmartTrader.Application.Interfaces.Services;
 using SmartTrader.Application.Interfaces.Strategies;
 using SmartTrader.Application.Models;
 using SmartTrader.Domain.Entities;
 using SmartTrader.Domain.Enums;
+using SmartTrader.Infrastructure.Services;
 
 namespace SmartTrader.WorkerService.Workers
 {
@@ -27,108 +28,124 @@ namespace SmartTrader.WorkerService.Workers
             {
                 _logger.LogInformation("ClosePositionWorker running at: {time}", DateTimeOffset.Now);
 
-                using (var scope = _serviceProvider.CreateScope())
-                {
-                    var positionRepo = scope.ServiceProvider.GetRequiredService<IPositionRepository>();
-                    var strategyRepo = scope.ServiceProvider.GetRequiredService<IStrategyRepository>();
-                    var strategyFactory = scope.ServiceProvider.GetRequiredService<IStrategyFactory>();
-                    var walletRepo = scope.ServiceProvider.GetRequiredService<IWalletRepository>();
-                    var exchangeRepo = scope.ServiceProvider.GetRequiredService<IExchangeRepository>();
-                    var exchangeFactory = scope.ServiceProvider.GetRequiredService<IExchangeServiceFactory>();
+                using var scope = _serviceProvider.CreateScope();
 
-                    var openPositions = await positionRepo.GetOpenPositionsAsync();
-                    if (openPositions.Any()) {
-                        await Task.Delay(TimeSpan.FromSeconds(_intervalSeconds), stoppingToken);
-                        continue; 
+                var positionRepo = scope.ServiceProvider.GetRequiredService<IPositionRepository>();
+                var strategyRepo = scope.ServiceProvider.GetRequiredService<IStrategyRepository>();
+                var strategyFactory = scope.ServiceProvider.GetRequiredService<IStrategyFactory>();
+                var walletRepo = scope.ServiceProvider.GetRequiredService<IWalletRepository>();
+                var exchangeRepo = scope.ServiceProvider.GetRequiredService<IExchangeRepository>();
+                var exchangeFactory = scope.ServiceProvider.GetRequiredService<IExchangeServiceFactory>();
+                var telegramNotifier = scope.ServiceProvider.GetRequiredService<ITelegramNotifier>(); // Resolve سرویس جدید
+
+                var openPositions = await positionRepo.GetOpenPositionsAsync();
+                if (!openPositions.Any())
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(_intervalSeconds), stoppingToken);
+                    continue;
+                }
+
+                var strategies = (await strategyRepo.GetAllAsync()).ToDictionary(s => s.StrategyID);
+                var wallets = (await walletRepo.GetActiveWalletsAsync()).ToDictionary(w => w.WalletID);
+                var exchanges = (await exchangeRepo.GetAllAsync()).ToDictionary(e => e.ExchangeID);
+
+                foreach (var position in openPositions)
+                {
+                    if (!wallets.TryGetValue(position.WalletID, out var wallet) ||
+                        !exchanges.TryGetValue(wallet.ExchangeID, out var exchange))
+                    {
+                        _logger.LogError("Wallet or exchange not found for position {PositionID}", position.PositionID);
+                        continue;
                     }
 
-                    var strategies = (await strategyRepo.GetAllAsync()).ToDictionary(s => s.StrategyID);
-                    var wallets = (await walletRepo.GetActiveWalletsAsync()).ToDictionary(w => w.WalletID);
-                    var exchanges = (await exchangeRepo.GetAllAsync()).ToDictionary(e => e.ExchangeID);
+                    var exchangeService = exchangeFactory.CreateService(wallet, exchange);
+                    bool actionSuccess = false;
+                    decimal actionPrice = await exchangeService.GetLastPriceAsync(position.Symbol);
 
-                    foreach (var position in openPositions)
+
+                    if (!position.ExitStrategyID.HasValue || !strategies.TryGetValue(position.ExitStrategyID.Value, out var exitStrategy))
                     {
-                        if (!position.ExitStrategyID.HasValue || !strategies.TryGetValue(position.ExitStrategyID.Value, out var exitStrategy))
-                        {
-                            _logger.LogWarning("Exit strategy for position {PositionID} is not defined or found.", position.PositionID);
-                            continue;
-                        }
+                        _logger.LogWarning("Exit strategy for position {PositionID} is not defined or found.", position.PositionID);
+                        continue;
+                    }
 
-                        var strategyHandler = strategyFactory.CreateExitStrategy(exitStrategy);
-                        var signal = await strategyHandler.ExecuteAsync(position);
+                    var strategyHandler = strategyFactory.CreateExitStrategy(exitStrategy);
+                    var signal = await strategyHandler.ExecuteAsync(position);
 
-                        if (signal.Signal != SignalType.Hold)
-                        {
-                            _logger.LogInformation("Executing action '{SignalType}' for position {PositionID}. Reason: {Reason}",
-                                signal.Signal, position.PositionID, signal.Reason);
+                    if (signal.Signal == SignalType.Hold) continue;
 
-                            if (!wallets.TryGetValue(position.WalletID, out var wallet) || !exchanges.TryGetValue(wallet.ExchangeID, out var exchange))
+                    
+
+                    switch (signal.Signal)
+                    {
+                        case SignalType.CloseByTP:
+                        case SignalType.CloseBySL:
+                            var closeResult = await exchangeService.ClosePositionAsync(position.Symbol, position.PositionSide, position.CurrentQuantity);
+                            if (closeResult.IsSuccess)
                             {
-                                _logger.LogError("Could not find wallet/exchange to execute trade for position {PositionID}.", position.PositionID);
-                                continue;
+                                position.ProfitUSD = (position.ProfitUSD ?? 0) + (closeResult.AveragePrice - position.EntryPrice) * position.CurrentQuantity * (position.PositionSide == "LONG" ? 1 : -1);
+                                position.Status = PositionStatus.Closed;
+                                position.CloseTimestamp = DateTime.UtcNow;
+                                position.CurrentQuantity = 0;
+                                await positionRepo.UpdateAsync(position);
+                                actionSuccess = true;
                             }
+                            break;
 
-                            var exchangeService = exchangeFactory.CreateService(wallet, exchange);
-                            bool actionSuccess = false;
-                            decimal actionPrice = await exchangeService.GetLastPriceAsync(position.Symbol);
-
-                            switch (signal.Signal)
+                        case SignalType.PartialClose:
+                            if (signal.PartialPercent.HasValue && signal.PartialPercent > 0)
                             {
-                                case SignalType.CloseByTP:
-                                case SignalType.CloseBySL:
-                                    var closeResult = await exchangeService.ClosePositionAsync(position.Symbol, position.PositionSide, position.CurrentQuantity);
-                                    if (closeResult.IsSuccess)
+                                decimal quantityToClose = position.CurrentQuantity * (signal.PartialPercent.Value / 100);
+                                var filterInfo = await exchangeService.GetSymbolFilterInfoAsync(position.Symbol);
+                                if (filterInfo != null) quantityToClose = Math.Floor(quantityToClose / filterInfo.StepSize) * filterInfo.StepSize;
+
+                                if (quantityToClose > 0)
+                                {
+                                    var sellResult = await exchangeService.ModifyPositionAsync(position.Symbol, "SELL", quantityToClose);
+                                    if (sellResult.IsSuccess)
                                     {
-                                        position.Status = PositionStatus.Closed;
-                                        position.ProfitUSD = (closeResult.AveragePrice - position.EntryPrice) * position.CurrentQuantity * (position.PositionSide == "LONG" ? 1 : -1);
-                                        position.CloseTimestamp = DateTime.UtcNow;
+                                        decimal realizedProfit = (sellResult.AveragePrice - position.EntryPrice) * sellResult.Quantity * (position.PositionSide == "LONG" ? 1 : -1);
+                                        position.CurrentQuantity -= sellResult.Quantity;
+                                        position.ProfitUSD = (position.ProfitUSD ?? 0) + realizedProfit;
+                                        if (position.CurrentQuantity <= 0)
+                                        {
+                                            position.Status = PositionStatus.Closed;
+                                            position.CloseTimestamp = DateTime.UtcNow;
+                                        }
                                         await positionRepo.UpdateAsync(position);
                                         actionSuccess = true;
                                     }
-                                    break;
-
-                                case SignalType.SellProfit:
-                                    var quantityToSell = position.CurrentQuantity * (signal.PercentPosition.Value / 100);
-                                    // TODO: Implement ModifyPositionAsync in IExchangeService and BinanceService
-                                    // var sellResult = await exchangeService.ModifyPositionAsync(position.Symbol, "SELL", quantityToSell);
-                                    // if(sellResult.IsSuccess) { ... update position quantity and realized PnL ...; actionSuccess = true; }
-                                    break;
-
-                                case SignalType.BuyRollback:
-                                    var balance = await exchangeService.GetFreeBalanceAsync();
-                                    var amountToBuyUSD = balance * (signal.PercentBalance.Value / 100);
-                                    var quantityToBuy = amountToBuyUSD / actionPrice;
-                                    // TODO: Implement ModifyPositionAsync in IExchangeService and BinanceService
-                                    // var buyResult = await exchangeService.ModifyPositionAsync(position.Symbol, "BUY", quantityToBuy);
-                                    // if(buyResult.IsSuccess) { ... update position quantity and average entry price ...; actionSuccess = true; }
-                                    break;
-
-                                case SignalType.ChangeSL:
-                                    // TODO: Implement UpdateStopLossAsync in IExchangeService and BinanceService
-                                    // var slResult = await exchangeService.UpdateStopLossAsync(position.Symbol, signal.NewStopLossPrice.Value);
-                                    // if(slResult.IsSuccess) { actionSuccess = true; }
-                                    break;
+                                }
                             }
+                            break;
 
-                            if (actionSuccess)
+                        case SignalType.ChangeSL:
+                            if (signal.NewStopLossPrice.HasValue)
                             {
-                                var history = new PositionHistory
-                                {
-                                    PositionID = position.PositionID,
-                                    ActionType = (ActionType)Enum.Parse(typeof(ActionType), signal.Signal.ToString()), // Convert SignalType to ActionType
-                                    PercentPosition = signal.PercentPosition,
-                                    PercentBalance = signal.PercentBalance,
-                                    Price = actionPrice,
-                                    ActionTimestamp = DateTime.UtcNow,
-                                    Description = signal.Reason
-                                };
-                                await positionRepo.AddHistoryAsync(history);
-                                _logger.LogInformation("Action '{SignalType}' for position {PositionID} successfully executed and logged.", signal.Signal, position.PositionID);
+                                var slResult = await exchangeService.UpdateStopLossAsync(position.Symbol, position.PositionSide, signal.NewStopLossPrice.Value);
+                                if (slResult) actionSuccess = true;
                             }
-                        }
+                            break;
                     }
 
+                    if (actionSuccess)
+                    {
+                        await telegramNotifier.SendNotificationCloseAsync(signal, wallet.WalletName, actionPrice);
 
+                        var history = new PositionHistory
+                        {
+                            PositionID = position.PositionID,
+                            ActionType = signal.Signal,
+                            PercentPosition = signal.PartialPercent,
+                            Price = actionPrice,
+                            ActionTimestamp = DateTime.UtcNow,
+                            Description = signal.Reason
+                        };
+                        await positionRepo.AddHistoryAsync(history);
+
+                        _logger.LogInformation("Executed signal {Signal} for position {PositionID}. Reason: {Reason}",
+                            signal.Signal, position.PositionID, signal.Reason);
+                    }
                 }
 
                 await Task.Delay(TimeSpan.FromSeconds(_intervalSeconds), stoppingToken);
@@ -136,14 +153,3 @@ namespace SmartTrader.WorkerService.Workers
         }
     }
 }
-//foreach (var position in openPositions)
-//                    {
-//                        // TODO: منطق مدیریت پوزیشن‌های باز در اینجا پیاده‌سازی می‌شود.
-//                        // 1. اطلاعات کیف پول مربوط به پوزیشن را دریافت کنید تا به کلیدهای API دسترسی داشته باشید.
-//                        // 2. exchangeService را با کلیدهای API مربوطه Initialize کنید.
-//                        // 3. قیمت لحظه‌ای کوین را با exchangeService.GetLastPriceAsync دریافت کنید.
-//                        // 4. سود/زیان را محاسبه کنید.
-//                        // 5. بر اساس استراتژی خروج (حد سود/ضرر)، تصمیم به بستن پوزیشن بگیرید.
-//                        // 6. در صورت نیاز، پوزیشن را با exchangeService.ClosePositionAsync ببندید.
-//                        // 7. وضعیت پوزیشن را در دیتابیس با positionRepository.UpdateAsync به‌روزرسانی کنید.
-//                    }
