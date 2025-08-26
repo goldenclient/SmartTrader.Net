@@ -1,5 +1,19 @@
-﻿// src/SmartTrader.Infrastructure/Strategies/Exit/TakeProfitStopLossExitStrategy.cs (کاملاً جدید)
+﻿// استراتژی خروج:
+// - مدت نگهداری بدون شرط پوزیشن:
+// از نقطه ورود تا انتهای کندل بعد در تایم فریم 5 دقیقه
+
+// - شرطهای خروج برای لانگ بعد از مدت نگهداری:
+// - اگر RSI کندل قبل منهای RSI کندل حاری بیشتر از 10 بود خارج شود
+// - اگر RSI بزرگتر از 80 شد و کندل قرمز بود خارج شود
+// - اگر RSI کندل قبل بزرگتر از 75 بود و RSI فعلی کمتر از 70 شد خارج شود
+
+// - شرطهای خروج برای شورت بعد از مدت نگهداری:
+// - اگر RSI کندل جاری منهای RSI کندل قبل بیشتر از 10 بود خارج شود
+// - اگر RSI کمتر از 20 شد و کندل سبز بود خارج شود
+// - اگر RSI کندل قبل کمتر از 25 بود و RSI فعلی بیشتر از 30 شد خارج شود
+
 using Microsoft.Extensions.Logging;
+using Skender.Stock.Indicators;
 using SmartTrader.Application.Interfaces.Persistence;
 using SmartTrader.Application.Interfaces.Services;
 using SmartTrader.Application.Interfaces.Strategies;
@@ -35,8 +49,7 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
 
         public async Task<StrategySignal> ExecuteAsync(Position position)
         {
-            // استراتژی اکنون مسئول جمع‌آوری داده‌های مورد نیاز خود است
-            // نکته: برای بهینه‌سازی، می‌توان این اطلاعات را در Worker کش کرد و به استراتژی پاس داد
+            // --- گرفتن اطلاعات پایه ---
             var wallet = (await _walletRepo.GetActiveWalletsAsync()).FirstOrDefault(w => w.WalletID == position.WalletID);
             var exchange = (await _exchangeRepo.GetAllAsync()).FirstOrDefault(e => e.ExchangeID == wallet?.ExchangeID);
             var strategy = (await _strategyRepo.GetAllAsync()).FirstOrDefault(s => s.StrategyID == position.ExitStrategyID);
@@ -48,28 +61,71 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             }
 
             var exchangeService = _exchangeFactory.CreateService(wallet, exchange);
-            var lastPrice = await exchangeService.GetLastPriceAsync(position.Symbol);
-            if (lastPrice == 0) return new StrategySignal { Signal = SignalType.Hold, Reason = "Price not available." };
 
-            // ... منطق استراتژی ...
-            // در اینجا باید StopLoss و TakeProfit را از جایی بخوانید (مثلاً از Description استراتژی یا هاردکد)
-            decimal takeProfitPercent = 5.0m;
-            decimal stopLossPercent = 2.0m;
+            // گرفتن کندل‌های 5 دقیقه‌ای (حداقل 3 کندل برای محاسبه RSI قبل/فعلی)
+            var klines = (await exchangeService.GetKlinesAsync(position.Symbol, TimeFrame.FiveMinute.ToString(), 50)).ToList();
+            if (klines.Count < 5)
+                return new StrategySignal { Signal = SignalType.Hold, Reason = "Not enough candle data." };
 
-            decimal pnlPercentage = (position.PositionSide == "LONG")
-                ? (lastPrice - position.EntryPrice) / position.EntryPrice
-                : (position.EntryPrice - lastPrice) / position.EntryPrice;
-
-            if (pnlPercentage * 100 >= takeProfitPercent)
+            // تبدیل به Quote برای محاسبات
+            var quotes = klines.Select(k => new Quote
             {
-                return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "Take Profit reached." };
-            }
-            if (pnlPercentage * 100 <= -stopLossPercent)
+                Date = k.OpenTime,
+                Open = k.OpenPrice,
+                High = k.HighPrice,
+                Low = k.LowPrice,
+                Close = k.ClosePrice,
+                Volume = k.Volume
+            }).ToList();
+
+            // محاسبه RSI روی دیتای بسته شدن
+            var rsi = quotes.GetRsi(14).ToList();
+            if (rsi.Count < 2)
+                return new StrategySignal { Signal = SignalType.Hold, Reason = "Not enough RSI data." };
+
+            decimal rsiPrev = (decimal)rsi[^2].Rsi!;
+            decimal rsiCurr = (decimal)rsi[^1].Rsi!;
+
+            var lastCandle = quotes[^1];
+            var prevCandle = quotes[^2];
+
+            bool isGreen = lastCandle.Close > lastCandle.Open;
+            bool isRed = lastCandle.Close < lastCandle.Open;
+
+            // شرط مدت نگهداری: حداقل تا پایان کندل بعد از ورود
+            if (DateTime.UtcNow < position.OpenTimestamp.AddMinutes(10))
             {
-                return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "Stop Loss reached." };
+                return new StrategySignal { Signal = SignalType.Hold, Reason = "Minimum holding period not reached." };
             }
 
-            return new StrategySignal();
+            // ----- استراتژی خروج لانگ -----
+            if (position.PositionSide.Equals("LONG", StringComparison.OrdinalIgnoreCase))
+            {
+                if (rsiPrev - rsiCurr > 10)
+                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI dropped sharply (>10)." };
+
+                if (rsiCurr > 80 && isRed)
+                    return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI > 80 with red candle." };
+
+                if (rsiPrev > 75 && rsiCurr < 70)
+                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI rolled down from >75 to <70." };
+            }
+
+            // ----- استراتژی خروج شورت -----
+            if (position.PositionSide.Equals("SHORT", StringComparison.OrdinalIgnoreCase))
+            {
+                if (rsiCurr - rsiPrev > 10)
+                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI jumped sharply (>10)." };
+
+                if (rsiCurr < 20 && isGreen)
+                    return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI < 20 with green candle." };
+
+                if (rsiPrev < 25 && rsiCurr > 30)
+                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI climbed from <25 to >30." };
+            }
+
+            return new StrategySignal { Signal = SignalType.Hold, Reason = "No exit condition met." };
         }
+
     }
 }
