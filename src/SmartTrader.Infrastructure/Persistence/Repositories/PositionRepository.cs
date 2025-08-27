@@ -36,7 +36,7 @@ namespace SmartTrader.Infrastructure.Persistence.Repositories
 
         public async Task<bool> HasOpenPositionAsync(int walletId, string symbol)
         {
-            const string sql = "SELECT COUNT(1) FROM Positions WHERE WalletID = @WalletID AND Symbol = @Symbol AND Status = 'Open'";
+            string sql = "SELECT COUNT(1) FROM Positions WHERE WalletID = @WalletID AND Symbol = @Symbol AND Status = '" + PositionStatus.Open.ToString() + "'";
             using var connection = CreateConnection();
             return await connection.ExecuteScalarAsync<bool>(sql, new { WalletID = walletId, Symbol = symbol });
         }
