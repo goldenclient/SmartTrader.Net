@@ -71,7 +71,7 @@ namespace SmartTrader.Infrastructure.Services
             }
         }
 
-        public async Task SendNotificationCloseAsync(StrategySignal signal, string walletName,decimal actionPrice)
+        public async Task SendNotificationCloseAsync(StrategySignal signal, string walletName,decimal actionPrice,Position position)
         {
             if (string.IsNullOrEmpty(_botToken) || string.IsNullOrEmpty(_channelId))
             {
@@ -82,9 +82,9 @@ namespace SmartTrader.Infrastructure.Services
             var messageBuilder = new StringBuilder();
             messageBuilder.AppendLine($"🚨 **Action Position** 🚨");
             messageBuilder.AppendLine($"**WalletName:** `{walletName}`");
-            messageBuilder.AppendLine($"**Symbol:** `{signal.Symbol}`");
+            messageBuilder.AppendLine($"**Symbol:** `{position.Symbol}`");
             messageBuilder.AppendLine($"**Price:** `{actionPrice}`");
-            messageBuilder.AppendLine($"**Percent %:** `{signal.PartialPercent}`");
+            messageBuilder.AppendLine($"**Pos USDT %:** `{position.EntryValueUSD}`");
             messageBuilder.AppendLine($"**Reason:** `{signal.Reason}`");
 
             var message = messageBuilder.ToString();

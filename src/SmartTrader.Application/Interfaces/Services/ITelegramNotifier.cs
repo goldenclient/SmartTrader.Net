@@ -8,6 +8,6 @@ namespace SmartTrader.Application.Interfaces.Services
     public interface ITelegramNotifier
     {
         Task SendNotificationAsync(StrategySignal signal, string coinName, string strategyName,string walletName,decimal price);
-        Task SendNotificationCloseAsync(StrategySignal signal,string walletName,decimal actionPrice);
+        Task SendNotificationCloseAsync(StrategySignal signal,string walletName,decimal actionPrice, Position position );
     }
 }

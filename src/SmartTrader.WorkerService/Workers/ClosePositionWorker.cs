@@ -90,7 +90,7 @@ namespace SmartTrader.WorkerService.Workers
                             var closeResult = await exchangeService.ClosePositionAsync(position.Symbol, position.PositionSide, position.CurrentQuantity);
                             if (closeResult.IsSuccess)
                             {
-                                position.ProfitUSD = (position.ProfitUSD ?? 0) + (closeResult.AveragePrice - position.EntryPrice) * position.CurrentQuantity * (position.PositionSide == "LONG" ? 1 : -1);
+                                position.ProfitUSD = (position.ProfitUSD ?? 0) + (closeResult.AveragePrice - position.EntryPrice) * position.CurrentQuantity * (position.PositionSide == SignalType.OpenLong.ToString() ? 1 : -1);
                                 position.Status = PositionStatus.Closed.ToString();
                                 position.CloseTimestamp = DateTime.UtcNow;
                                 position.CurrentQuantity = 0;
@@ -137,7 +137,7 @@ namespace SmartTrader.WorkerService.Workers
 
                     if (actionSuccess)
                     {
-                        await telegramNotifier.SendNotificationCloseAsync(signal, wallet.WalletName, actionPrice);
+                        await telegramNotifier.SendNotificationCloseAsync(signal, wallet.WalletName, actionPrice, position);
 
                         var history = new PositionHistory
                         {
