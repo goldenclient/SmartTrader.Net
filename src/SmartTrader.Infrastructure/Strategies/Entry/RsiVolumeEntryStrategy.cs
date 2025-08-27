@@ -91,11 +91,11 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             var rsiDiffDown = prevRsi - lastRsi;
 
             // حجم
-            bool highVolume = lastCandle.Volume > (prevCandle.Volume * 3);
+            bool highVolume = lastCandle.Volume > (prevCandle.Volume * 2);
 
             // طول کندل
-            decimal lastRange = lastCandle.High - lastCandle.Low;
-            decimal prevRange = prevCandle.High - prevCandle.Low;
+            decimal lastRange =Math.Abs(lastCandle.Close - lastCandle.Open);
+            decimal prevRange =Math.Abs(prevCandle.Close - prevCandle.Open);
             bool longCandle = lastRange > (prevRange * 3);
 
             // رنگ کندل
@@ -103,7 +103,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             bool isRed = lastCandle.Close < lastCandle.Open;
 
             // ---- ورود لانگ ----
-            if (rsiDiffUp > 10 && highVolume && longCandle && isGreen)
+            if (rsiDiffUp > 10 && highVolume && longCandle && isGreen && lastRsi<75)
             {
                 _logger.LogInformation("LONG signal for {Symbol}", exchangeInfo.Symbol);
                 return new StrategySignal
@@ -116,7 +116,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             }
 
             // ---- ورود شورت ----
-            if (rsiDiffDown > 10 && highVolume && longCandle && isRed)
+            if (rsiDiffDown > 10 && highVolume && longCandle && isRed && lastRsi > 25)
             {
                 _logger.LogInformation("SHORT signal for {Symbol}", exchangeInfo.Symbol);
                 return new StrategySignal

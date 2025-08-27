@@ -101,27 +101,27 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             // ----- استراتژی خروج لانگ -----
             if (position.PositionSide.Equals("LONG", StringComparison.OrdinalIgnoreCase))
             {
-                if (rsiPrev - rsiCurr > 10)
+                if (rsiPrev - rsiCurr > 5)
                     return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI dropped sharply (>10)." };
 
                 if (rsiCurr > 80 && isRed)
                     return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI > 80 with red candle." };
 
-                if (rsiPrev > 75 && rsiCurr < 70)
-                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI rolled down from >75 to <70." };
+                //if (rsiPrev > 75 && rsiCurr < 70)
+                //    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI rolled down from >75 to <70." };
             }
 
             // ----- استراتژی خروج شورت -----
             if (position.PositionSide.Equals("SHORT", StringComparison.OrdinalIgnoreCase))
             {
-                if (rsiCurr - rsiPrev > 10)
+                if (rsiCurr - rsiPrev > 5)
                     return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI jumped sharply (>10)." };
 
                 if (rsiCurr < 20 && isGreen)
                     return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI < 20 with green candle." };
 
-                if (rsiPrev < 25 && rsiCurr > 30)
-                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI climbed from <25 to >30." };
+                //if (rsiPrev < 25 && rsiCurr > 30)
+                //    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI climbed from <25 to >30." };
             }
 
             return new StrategySignal { Signal = SignalType.Hold, Reason = "No exit condition met." };
