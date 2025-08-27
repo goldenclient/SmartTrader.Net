@@ -57,13 +57,13 @@ namespace SmartTrader.WorkerService.Workers
                         _logger.LogError("Wallet or exchange not found for position {PositionID}", position.PositionID);
                         continue;
                     }
-                    if (!await positionRepo.HasOpenPositionAsync(position.WalletID, position.Symbol))
-                    {
-                        position.Status = PositionStatus.Closed.ToString();
-                        position.CloseTimestamp = DateTime.UtcNow;
-                        await positionRepo.UpdateAsync(position);
-                        continue; // این ولت برای این کوین پوزیشن باز دارد
-                    }
+                    //if (!await positionRepo.HasOpenPositionAsync(position.WalletID, position.Symbol))
+                    //{
+                    //    position.Status = PositionStatus.Closed.ToString();
+                    //    position.CloseTimestamp = DateTime.UtcNow;
+                    //    await positionRepo.UpdateAsync(position);
+                    //    continue; // این ولت برای این کوین پوزیشن باز دارد
+                    //}
 
                     var exchangeService = exchangeFactory.CreateService(wallet, exchange);
                     bool actionSuccess = false;
@@ -146,7 +146,7 @@ namespace SmartTrader.WorkerService.Workers
                             PercentPosition = signal.PartialPercent,
                             Price = actionPrice,
                             ActionTimestamp = DateTime.UtcNow,
-                            Description = signal.Reason
+                            Description = signal.Reason,
                         };
                         await positionRepo.AddHistoryAsync(history);
 

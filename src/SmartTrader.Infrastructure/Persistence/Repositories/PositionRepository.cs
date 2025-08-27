@@ -69,7 +69,7 @@ namespace SmartTrader.Infrastructure.Persistence.Repositories
         {
             const string sql = @"
         INSERT INTO PositionHistory (PositionID, ActionType, PercentPosition, PercentBalance, Price, ActionTimestamp, Description)
-        VALUES (@PositionID, @ActionType, @Price, @ActionTimestamp, @Description);";
+        VALUES (@PositionID, @ActionType, @PercentPosition, @PercentBalance, @Price, @ActionTimestamp, @Description);";
             using var connection = CreateConnection();
             await connection.ExecuteAsync(sql, history);
         }

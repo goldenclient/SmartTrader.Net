@@ -86,7 +86,7 @@ namespace SmartTrader.Infrastructure.Services
 
         public async Task<OrderResult> ClosePositionAsync(string symbol, string side, decimal quantity)
         {
-            var closeSide = side.ToUpper() == "LONG" ? OrderSide.Sell : OrderSide.Buy;
+            var closeSide = side.ToUpper() == SignalType.OpenLong.ToString().ToUpper() ? OrderSide.Sell : OrderSide.Buy;
             var result = await _client.UsdFuturesApi.Trading.PlaceOrderAsync(symbol, closeSide, FuturesOrderType.Market, quantity, reduceOnly: true);
 
             return result.Success

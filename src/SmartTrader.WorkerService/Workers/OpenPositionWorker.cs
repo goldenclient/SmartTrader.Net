@@ -64,7 +64,7 @@ namespace SmartTrader.WorkerService.Workers
                             if (signal.Signal == SignalType.OpenLong || signal.Signal == SignalType.OpenShort)
                             {
                                 _logger.LogInformation("Signal {Signal} for {CoinName} received. Notifying and applying to eligible wallets.", signal.Signal, coin.CoinName);
-                                await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, "Strategy", 0);
+                                //await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, "Strategy", 0);
 
                                 //continue;
                                 foreach (var wallet in wallets)
