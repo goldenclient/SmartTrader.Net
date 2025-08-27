@@ -34,7 +34,7 @@ namespace SmartTrader.Infrastructure.Strategies
         {
             switch (strategy.StrategyName)
             {
-                case "TakeProfitStopLossExit":
+                case "TakeProfitStopLossExitStrategy":
                     return _serviceProvider.GetRequiredService<TakeProfitStopLossExitStrategy>();
                 default:
                     throw new NotSupportedException($"Exit Strategy '{strategy.StrategyName}' is not supported.");

@@ -86,6 +86,7 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             decimal rsiPrev = (decimal)rsi[^2].Rsi!;
             decimal rsiCurr = (decimal)rsi[^1].Rsi!;
 
+            _logger.LogInformation("Symbol: {symbol} - RSI: {rsi1} , {rsi}", position.Symbol,Math.Round(rsiPrev,2),Math.Round(rsiCurr,2));
             var lastCandle = quotes[^1];
             var prevCandle = quotes[^2];
 

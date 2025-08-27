@@ -20,7 +20,7 @@ namespace SmartTrader.Domain.Entities
         public decimal? TakeProfit { get; set; }
         public string Symbol { get; set; }
         public string PositionSide { get; set; }
-        public PositionStatus Status { get; set; } // از Enum استفاده می‌شود
+        public string Status { get; set; } // از Enum استفاده می‌شود
         public decimal EntryPrice { get; set; }
         public decimal EntryValueUSD { get; set; }
         public decimal CurrentQuantity { get; set; }

@@ -3,6 +3,7 @@ using Dapper;
 using Microsoft.Extensions.Configuration;
 using SmartTrader.Application.Interfaces.Persistence;
 using SmartTrader.Domain.Entities;
+using SmartTrader.Domain.Enums;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -28,7 +29,7 @@ namespace SmartTrader.Infrastructure.Persistence.Repositories
         public async Task<IEnumerable<Position>> GetOpenPositionsAsync()
         {
             // از نام Enum برای فیلتر کردن استفاده می‌کنیم
-            const string sql = "SELECT * FROM Positions WHERE Status = 'Open'";
+            string sql = "SELECT * FROM Positions WHERE Status = '" + PositionStatus.Open.ToString() + "'";
             using var connection = CreateConnection();
             return await connection.QueryAsync<Position>(sql);
         }

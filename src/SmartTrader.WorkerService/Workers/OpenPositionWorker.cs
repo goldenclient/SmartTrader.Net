@@ -99,7 +99,7 @@ namespace SmartTrader.WorkerService.Workers
                                     if (lastPrice == 0) continue;
 
                                     var initialQuantity = positionValue / lastPrice;
-
+                                    initialQuantity = initialQuantity * (signal.Leverage ?? 1);
                                     // 3. اعتبارسنجی و تنظیم حجم معامله بر اساس قوانین صرافی
                                     if (initialQuantity < filterInfo.MinQuantity)
                                     {
@@ -111,9 +111,9 @@ namespace SmartTrader.WorkerService.Workers
                                     signal.Quantity = adjustedQuantity;
                                     // ارسال کل آبجکت سیگنال به سرویس صرافی
                                     var openResult = await exchangeService.OpenPositionAsync(signal);
+                                    await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName, lastPrice);
                                     if (openResult.IsSuccess)
                                     {
-                                        await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName,wallet.WalletName, lastPrice);
                                         // انتخاب استراتژی خروج
                                         int? exitStrategyId = wallet.ForceExitStrategyID ?? defaultExitStrategy?.StrategyID;
                                         if (!exitStrategyId.HasValue)
@@ -128,7 +128,7 @@ namespace SmartTrader.WorkerService.Workers
                                             ExitStrategyID = exitStrategyId, // منطق جدید
                                             Symbol = symbol,
                                             PositionSide = signal.Signal.ToString(),
-                                            Status = PositionStatus.Open, // استفاده از Enum
+                                            Status = PositionStatus.Open.ToString(), // استفاده از Enum
                                             EntryPrice = openResult.AveragePrice,
                                             EntryValueUSD = positionValue,
                                             CurrentQuantity = openResult.Quantity,
