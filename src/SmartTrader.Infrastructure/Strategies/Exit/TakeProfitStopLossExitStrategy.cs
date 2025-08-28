@@ -91,14 +91,16 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             bool isGreen = lastCandle.Close > lastCandle.Open;
             bool isRed = lastCandle.Close < lastCandle.Open;
 
-            if (DateTime.UtcNow > position.OpenTimestamp.AddMinutes(5) && position.Stoploss == null)
+            var candleClose = GetCandleCloseTime(position.OpenTimestamp, 5);
+
+            if (DateTime.UtcNow > candleClose.AddMinutes(1) && position.Stoploss == null)
             {
                 var stoploss = (prevCandle.Close + prevCandle.Open) / 2;
                 return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Set StopLoss => " + position.Symbol + "=SL:" + position.Stoploss, NewStopLossPrice = stoploss };
             }
 
             // شرط مدت نگهداری: حداقل تا پایان کندل بعد از ورود
-            if (DateTime.UtcNow < position.OpenTimestamp.AddMinutes(10))
+            if (DateTime.UtcNow < candleClose.AddMinutes(5))
             {
                 return new StrategySignal { Signal = SignalType.Hold, Reason = "Minimum holding period not reached." };
             }
@@ -132,5 +134,15 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             return new StrategySignal { Signal = SignalType.Hold, Reason = "No exit condition met." };
         }
 
+        private DateTime GetCandleCloseTime(DateTime openTime, int timeframeMinutes = 5)
+        {
+            var totalMinutes = openTime.Hour * 60 + openTime.Minute;
+            var currentCandle = totalMinutes / timeframeMinutes;
+            var closeMinutes = (currentCandle + 1) * timeframeMinutes;
+
+            return openTime.Date.AddMinutes(closeMinutes);
+        }
+
     }
+
 }
