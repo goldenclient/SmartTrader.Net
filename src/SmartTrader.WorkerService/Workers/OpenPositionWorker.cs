@@ -79,11 +79,11 @@ namespace SmartTrader.WorkerService.Workers
                                     if (exchangeInfo == null) continue;
 
                                     string symbol = exchangeInfo.Symbol;
-                                    if (await positionRepo.HasOpenPositionAsync(wallet.WalletID, symbol))
+                                    if (await positionRepo.HasOpenPositionAsync(wallet.WalletID, symbol, strategy.StrategyID))
                                     {
                                         continue; // این ولت برای این کوین پوزیشن باز دارد
+                                        // این ولت برای این استراتژی (فقط استراتژی هایی که onlyones=1 است)، پوزیشن باز دارد
                                     }
-
 
                                     // 3. اجرای معامله بر اساس پارامترهای سیگنال
                                     var exchangeService = exchangeFactory.CreateService(wallet, exchange);

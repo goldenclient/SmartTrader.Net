@@ -13,6 +13,7 @@ namespace SmartTrader.Domain.Entities
         public decimal? TakeProfit { get; set; }
         public int? Leverage { get; set; }
         public int? TimeFrame { get; set; }
+        public bool? OnlyOne { get; set; }
 
     }
 }
