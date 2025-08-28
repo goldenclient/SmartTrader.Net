@@ -91,7 +91,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             var rsiDiffDown = prevRsi - lastRsi;
 
             // حجم
-            bool highVolume = lastCandle.Volume > (prevCandle.Volume * 2);
+            bool highVolume = lastCandle.Volume > (prevCandle.Volume * 1);
 
             // طول کندل
             decimal lastRange =Math.Abs(lastCandle.Close - lastCandle.Open);

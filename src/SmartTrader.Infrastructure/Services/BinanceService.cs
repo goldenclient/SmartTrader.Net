@@ -156,7 +156,7 @@ namespace SmartTrader.Infrastructure.Services
         // src/SmartTrader.Infrastructure/Services/BinanceService.cs
         public async Task<OrderResult> ModifyPositionAsync(string symbol, string side, decimal quantity)
         {
-            var orderSide = side.ToUpper() == "BUY" ? OrderSide.Buy : OrderSide.Sell;
+            var orderSide = side.ToUpper() == SignalType.OpenLong.ToString().ToUpper() ? OrderSide.Buy : OrderSide.Sell;
             // هنگام فروش بخشی، سفارش باید از نوع reduceOnly باشد
             // هنگام خرید مجدد، سفارش از نوع عادی است
             bool reduceOnly = orderSide == OrderSide.Sell;
@@ -178,7 +178,7 @@ namespace SmartTrader.Infrastructure.Services
             }
 
             // برای تنظیم حد ضرر، یک سفارش STOP_MARKET در جهت مخالف پوزیشن ثبت می‌کنیم
-            var orderSide = positionSide.ToUpper() == "LONG" ? OrderSide.Sell : OrderSide.Buy;
+            var orderSide = positionSide.ToUpper() == SignalType.OpenLong.ToString().ToUpper() ? OrderSide.Sell : OrderSide.Buy;
 
             var result = await _client.UsdFuturesApi.Trading.PlaceOrderAsync(
                 symbol,

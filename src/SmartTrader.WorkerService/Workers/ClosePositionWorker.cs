@@ -111,7 +111,7 @@ namespace SmartTrader.WorkerService.Workers
                                     var sellResult = await exchangeService.ModifyPositionAsync(position.Symbol, "SELL", quantityToClose);
                                     if (sellResult.IsSuccess)
                                     {
-                                        decimal realizedProfit = (sellResult.AveragePrice - position.EntryPrice) * sellResult.Quantity * (position.PositionSide == "LONG" ? 1 : -1);
+                                        decimal realizedProfit = (sellResult.AveragePrice - position.EntryPrice) * sellResult.Quantity * (position.PositionSide == SignalType.OpenLong.ToString() ? 1 : -1);
                                         position.CurrentQuantity -= sellResult.Quantity;
                                         position.ProfitUSD = (position.ProfitUSD ?? 0) + realizedProfit;
                                         if (position.CurrentQuantity <= 0)

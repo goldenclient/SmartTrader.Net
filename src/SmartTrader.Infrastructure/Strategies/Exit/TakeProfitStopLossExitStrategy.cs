@@ -86,12 +86,18 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             decimal rsiPrev = (decimal)rsi[^2].Rsi!;
             decimal rsiCurr = (decimal)rsi[^1].Rsi!;
 
-            _logger.LogInformation("Symbol: {symbol} - RSI: {rsi1} , {rsi}", position.Symbol,Math.Round(rsiPrev,2),Math.Round(rsiCurr,2));
+            _logger.LogInformation("Symbol: {symbol} - RSI: {rsi1} , {rsi}", position.Symbol, Math.Round(rsiPrev, 2), Math.Round(rsiCurr,2));
             var lastCandle = quotes[^1];
             var prevCandle = quotes[^2];
 
             bool isGreen = lastCandle.Close > lastCandle.Open;
             bool isRed = lastCandle.Close < lastCandle.Open;
+
+            if (DateTime.UtcNow > position.OpenTimestamp.AddMinutes(5) && position.Stoploss == null)
+            {
+                var stoploss = (prevCandle.Close + prevCandle.Open) / 2;
+                return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Set StopLoss => " + position.Symbol + "=SL:" + position.Stoploss, NewStopLossPrice = stoploss };
+            }
 
             // شرط مدت نگهداری: حداقل تا پایان کندل بعد از ورود
             if (DateTime.UtcNow < position.OpenTimestamp.AddMinutes(10))
@@ -103,13 +109,13 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
             {
                 if (rsiPrev - rsiCurr > 5)
-                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI dropped sharply (>5)." };
+                    return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI dropped sharply (>5)." };
 
                 if (rsiCurr > 80 && isRed)
                     return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI > 80 with red candle." };
 
-                //if (rsiPrev > 75 && rsiCurr < 70)
-                //    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI rolled down from >75 to <70." };
+                if (lastCandle.Close < position.Stoploss)
+                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "StopLoss, down to midlle first candle" };
             }
 
             // ----- استراتژی خروج شورت -----
@@ -121,8 +127,8 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
                 if (rsiCurr < 20 && isGreen)
                     return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI < 20 with green candle." };
 
-                //if (rsiPrev < 25 && rsiCurr > 30)
-                //    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI climbed from <25 to >30." };
+                if (lastCandle.Close > position.Stoploss)
+                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "StopLoss, up to midlle first candle" };
             }
 
             return new StrategySignal { Signal = SignalType.Hold, Reason = "No exit condition met." };
