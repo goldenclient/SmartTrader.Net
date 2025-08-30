@@ -90,7 +90,7 @@ namespace SmartTrader.WorkerService.Workers
                             var closeResult = await exchangeService.ClosePositionAsync(position.Symbol, position.PositionSide, position.CurrentQuantity);
                             if (closeResult.IsSuccess)
                             {
-                                position.ProfitUSD = (position.ProfitUSD ?? 0) + (closeResult.AveragePrice - position.EntryPrice) * position.CurrentQuantity * (position.PositionSide == SignalType.OpenLong.ToString() ? 1 : -1);
+                                position.ProfitUSD = (position.ProfitUSD ?? 0) + (actionPrice - position.EntryPrice) * position.CurrentQuantity * (position.PositionSide == SignalType.OpenLong.ToString() ? 1 : -1);
                                 position.Status = PositionStatus.Closed.ToString();
                                 position.CloseTimestamp = DateTime.UtcNow;
                                 position.CurrentQuantity = 0;
@@ -111,7 +111,7 @@ namespace SmartTrader.WorkerService.Workers
                                     var sellResult = await exchangeService.ModifyPositionAsync(position.Symbol, "SELL", quantityToClose);
                                     if (sellResult.IsSuccess)
                                     {
-                                        decimal realizedProfit = (sellResult.AveragePrice - position.EntryPrice) * sellResult.Quantity * (position.PositionSide == SignalType.OpenLong.ToString() ? 1 : -1);
+                                        decimal realizedProfit = (actionPrice - position.EntryPrice) * sellResult.Quantity * (position.PositionSide == SignalType.OpenLong.ToString() ? 1 : -1);
                                         position.CurrentQuantity -= sellResult.Quantity;
                                         position.ProfitUSD = (position.ProfitUSD ?? 0) + realizedProfit;
                                         if (position.CurrentQuantity <= 0)
@@ -129,8 +129,8 @@ namespace SmartTrader.WorkerService.Workers
                         case SignalType.ChangeSL:
                             if (signal.NewStopLossPrice.HasValue)
                             {
-                                var slResult = await exchangeService.UpdateStopLossAsync(position.Symbol, position.PositionSide, signal.NewStopLossPrice.Value);
-                                if (slResult) actionSuccess = true;
+                                var slResult = await positionRepo.UpdateStopLossAsync(position.PositionID,signal.NewStopLossPrice.Value);
+                                actionSuccess = true;
                             }
                             break;
                     }
@@ -143,10 +143,11 @@ namespace SmartTrader.WorkerService.Workers
                         {
                             PositionID = position.PositionID,
                             ActionType = signal.Signal,
-                            PercentPosition = signal.PartialPercent,
+                            PercentPosition = signal.PartialPercent ?? 100,
                             Price = actionPrice,
                             ActionTimestamp = DateTime.UtcNow,
                             Description = signal.Reason,
+                            Profit = position.ProfitUSD
                         };
                         await positionRepo.AddHistoryAsync(history);
 

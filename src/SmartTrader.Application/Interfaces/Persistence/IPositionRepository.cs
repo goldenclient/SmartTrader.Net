@@ -8,6 +8,7 @@ namespace SmartTrader.Application.Interfaces.Persistence
     public interface IPositionRepository
     {
         Task<bool> HasOpenPositionAsync(int walletId, string symbol, int entrySignalId);
+        Task<bool> UpdateStopLossAsync(int positionId, decimal newStopLossPrice);
         Task<Position> CreateAsync(Position position);
         Task UpdateAsync(Position position);
         Task<IEnumerable<Position>> GetOpenPositionsAsync();

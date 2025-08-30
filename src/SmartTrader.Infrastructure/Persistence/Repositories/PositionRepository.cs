@@ -34,12 +34,20 @@ namespace SmartTrader.Infrastructure.Persistence.Repositories
             return await connection.QueryAsync<Position>(sql);
         }
 
-        public async Task<bool> HasOpenPositionAsync(int walletId, string symbol,int entrySignalId)
+        public async Task<bool> HasOpenPositionAsync(int walletId, string symbol, int entrySignalId)
         {
-            string sql = "SELECT COUNT(1) FROM Positions WHERE WalletID = @WalletID AND (Symbol = @Symbol OR (EntryStrategyID = @EntryStrategyID AND OnlyOne = 1)) AND Status = '" + PositionStatus.Open.ToString() + "'";
+            string sql = "SELECT COUNT(1) FROM Positions WHERE WalletID = @WalletID AND (Symbol = @Symbol OR (EntryStrategyID = @EntryStrategyID AND (select OnlyOne from Strategies where StrategyID=@EntryStrategyID) = 1)) AND Status = '" + PositionStatus.Open.ToString() + "'";
             using var connection = CreateConnection();
             return await connection.ExecuteScalarAsync<bool>(sql, new { WalletID = walletId, Symbol = symbol, EntryStrategyID = entrySignalId });
         }
+
+        public async Task<bool> UpdateStopLossAsync(int positionId, decimal newStopLossPrice)
+        {
+            string sql = "UPDATE positions SET Stoploss=@Stoploss where PositionID=@PositionID";
+            using var connection = CreateConnection();
+            return await connection.ExecuteScalarAsync<bool>(sql, new { Stoploss = newStopLossPrice, PositionID = positionId });
+        }
+
 
         public async Task UpdateAsync(Position position)
         {

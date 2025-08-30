@@ -30,7 +30,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             if (exchangeInfo == null) return new StrategySignal { Reason = "Symbol not found." };
 
             var marketDataService = _exchangeFactory.CreateService(new Wallet { ApiKey = "", SecretKey = "" }, new Exchange { ExchangeName = exchangeName });
-            var klines = (await marketDataService.GetKlinesAsync(exchangeInfo.Symbol,TimeFrame.FifteenMinute.ToString(),300)).ToList();
+            var klines = (await marketDataService.GetKlinesAsync(exchangeInfo.Symbol,"15",300)).ToList();
             if (klines.Count < 50) return new StrategySignal { Reason = "Not enough kline data." };
 
             var quotes = klines.Select(k => new Quote

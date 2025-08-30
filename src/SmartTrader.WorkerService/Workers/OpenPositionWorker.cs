@@ -5,6 +5,7 @@ using SmartTrader.Application.Interfaces.Strategies;
 using SmartTrader.Application.Models;
 using SmartTrader.Domain.Entities;
 using SmartTrader.Domain.Enums;
+using SmartTrader.Infrastructure.Services;
 
 namespace SmartTrader.WorkerService.Workers
 {
@@ -45,6 +46,9 @@ namespace SmartTrader.WorkerService.Workers
                     var allCoins = (await coinRepo.GetAllAsync()).ToDictionary(c => c.CoinID);
                     var telegramNotifier = scope.ServiceProvider.GetRequiredService<ITelegramNotifier>(); // Resolve سرویس جدید
 
+
+                    await telegramNotifier.SendNotificationHistoryAsync($"OpenPositionWorker running at: {DateTimeOffset.Now}");
+
                     foreach (var strategy in entryStrategies)
                     {
                         var tradableCoins = await strategyRepo.GetTradableCoinsByStrategyIdAsync(strategy.StrategyID);
@@ -63,6 +67,7 @@ namespace SmartTrader.WorkerService.Workers
                             // 2. اگر سیگنالی وجود داشت، آن را روی تمام ولت‌های واجد شرایط اعمال کن
                             if (signal.Signal == SignalType.OpenLong || signal.Signal == SignalType.OpenShort)
                             {
+                                await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, "SIGNAL", 0);
                                 _logger.LogInformation("Signal {Signal} for {CoinName} received. Notifying and applying to eligible wallets.", signal.Signal, coin.CoinName);
                                 //await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, "Strategy", 0);
 
@@ -81,6 +86,8 @@ namespace SmartTrader.WorkerService.Workers
                                     string symbol = exchangeInfo.Symbol;
                                     if (await positionRepo.HasOpenPositionAsync(wallet.WalletID, symbol, strategy.StrategyID))
                                     {
+                                        //signal.Reason = signal.Reason+"\nNot Open ==> Strategy HasOpen";
+                                        //await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName, 0);
                                         continue; // این ولت برای این کوین پوزیشن باز دارد
                                         // این ولت برای این استراتژی (فقط استراتژی هایی که onlyones=1 است)، پوزیشن باز دارد
                                     }
@@ -126,10 +133,11 @@ namespace SmartTrader.WorkerService.Workers
                                             CoinID = coin.CoinID,
                                             EntryStrategyID = strategy.StrategyID,
                                             ExitStrategyID = exitStrategyId, // منطق جدید
+                                            OrderId = openResult.OrderId,
                                             Symbol = symbol,
                                             PositionSide = signal.Signal.ToString(),
                                             Status = PositionStatus.Open.ToString(), // استفاده از Enum
-                                            EntryPrice = openResult.AveragePrice,
+                                            EntryPrice = lastPrice,
                                             EntryValueUSD = positionValue,
                                             CurrentQuantity = openResult.Quantity,
                                             OpenTimestamp = DateTime.UtcNow,

@@ -17,6 +17,7 @@ namespace SmartTrader.Infrastructure.Services
         private readonly HttpClient _httpClient;
         private readonly string _botToken;
         private readonly string _channelId;
+        private readonly string _channelHistoryId;
 
         public TelegramNotifier(ILogger<TelegramNotifier> logger, IConfiguration configuration)
         {
@@ -24,6 +25,7 @@ namespace SmartTrader.Infrastructure.Services
             _httpClient = new HttpClient();
             _botToken = configuration["TelegramSettings:BotToken"];
             _channelId = configuration["TelegramSettings:ChannelId"];
+            _channelHistoryId = configuration["TelegramSettings:ChannelHistoryId"];
         }
 
         public async Task SendNotificationAsync(StrategySignal signal, string coinName, string strategyName,string walletName,decimal price)
@@ -35,12 +37,10 @@ namespace SmartTrader.Infrastructure.Services
             }
 
             var messageBuilder = new StringBuilder();
-            messageBuilder.AppendLine($"🚨 **New Trading Signal** 🚨");
+            messageBuilder.AppendLine($"🚨 **" + signal.Signal + " Signal [ " + coinName + " ]** 🚨");
             messageBuilder.AppendLine($"**WalletName:** `{walletName}`");
             messageBuilder.AppendLine($"**Strategy:** `{strategyName}`");
-            messageBuilder.AppendLine($"**Coin:** `{coinName}`");
             messageBuilder.AppendLine($"**Price:** `{price}`");
-            messageBuilder.AppendLine($"**Signal:** `{signal.Signal}`");
             messageBuilder.AppendLine($"**Reason:** {signal.Reason}");
             messageBuilder.AppendLine($"");
             messageBuilder.AppendLine($"**Parameters:**");
@@ -80,11 +80,11 @@ namespace SmartTrader.Infrastructure.Services
             }
 
             var messageBuilder = new StringBuilder();
-            messageBuilder.AppendLine($"🚨 **Action Position** 🚨");
+            messageBuilder.AppendLine($"🚨 **"+signal.Signal+" [ "+position.Symbol+" ]** 🚨");
             messageBuilder.AppendLine($"**WalletName:** `{walletName}`");
-            messageBuilder.AppendLine($"**Symbol:** `{position.Symbol}`");
             messageBuilder.AppendLine($"**Price:** `{actionPrice}`");
             messageBuilder.AppendLine($"**Pos USDT %:** `{position.EntryValueUSD}`");
+            messageBuilder.AppendLine($"**Profit:** `{position.ProfitUSD}`");
             messageBuilder.AppendLine($"**Reason:** `{signal.Reason}`");
 
             var message = messageBuilder.ToString();
@@ -109,5 +109,11 @@ namespace SmartTrader.Infrastructure.Services
             }
         }
 
+        public async Task SendNotificationHistoryAsync(string reason)
+        {
+            var url = $"https://api.telegram.org/bot{_botToken}/sendMessage?chat_id={_channelHistoryId}&text={Uri.EscapeDataString(reason)}&parse_mode=Markdown";
+            try { var response = await _httpClient.GetAsync(url); }
+            catch{}
+        }
     }
 }

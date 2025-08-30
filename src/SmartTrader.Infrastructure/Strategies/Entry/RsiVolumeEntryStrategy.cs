@@ -57,7 +57,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             // ---- دیتای کندل 5 دقیقه ----
             var klines = (await marketDataService.GetKlinesAsync(
                 exchangeInfo.Symbol,
-                strategy.TimeFrame?.ToString() ?? TimeFrame.FiveMinute.ToString(),
+                strategy.TimeFrame?.ToString() ?? "5",
                 50)).ToList();
 
             if (klines.Count < 5)

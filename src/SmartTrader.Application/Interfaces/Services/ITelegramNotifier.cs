@@ -9,5 +9,6 @@ namespace SmartTrader.Application.Interfaces.Services
     {
         Task SendNotificationAsync(StrategySignal signal, string coinName, string strategyName,string walletName,decimal price);
         Task SendNotificationCloseAsync(StrategySignal signal,string walletName,decimal actionPrice, Position position );
+        Task SendNotificationHistoryAsync(string reason);
     }
 }

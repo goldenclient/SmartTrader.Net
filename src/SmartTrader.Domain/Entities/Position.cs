@@ -16,6 +16,7 @@ namespace SmartTrader.Domain.Entities
         public int CoinID { get; set; }
         public int EntryStrategyID { get; set; }
         public int? ExitStrategyID { get; set; }
+        public long? OrderId { get; set; }
         public decimal? Stoploss { get; set; }
         public decimal? TakeProfit { get; set; }
         public string Symbol { get; set; }

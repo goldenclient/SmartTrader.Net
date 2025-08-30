@@ -74,7 +74,7 @@ namespace SmartTrader.Infrastructure.Services
                 var result = await _client.UsdFuturesApi.Trading.PlaceOrderAsync(signal.Symbol, orderSide, FuturesOrderType.Market, signal.Quantity);
 
                 return result.Success
-                    ? new OrderResult { IsSuccess = true, OrderId = result.Data.Id, AveragePrice = result.Data.AveragePrice, Quantity = result.Data.Quantity }
+                    ? new OrderResult { IsSuccess = true, OrderId = result.Data.Id, AveragePrice = result.Data.Price, Quantity = result.Data.Quantity }
                     : new OrderResult { IsSuccess = false, ErrorMessage = result.Error?.Message };
             }
             catch (Exception ex)
@@ -90,39 +90,28 @@ namespace SmartTrader.Infrastructure.Services
             var result = await _client.UsdFuturesApi.Trading.PlaceOrderAsync(symbol, closeSide, FuturesOrderType.Market, quantity, reduceOnly: true);
 
             return result.Success
-                ? new OrderResult { IsSuccess = true, OrderId = result.Data.Id, AveragePrice = result.Data.AveragePrice, Quantity = result.Data.Quantity }
+                ? new OrderResult { IsSuccess = true, OrderId = result.Data.Id, AveragePrice = result.Data.Price, Quantity = result.Data.Quantity }
                 : new OrderResult { IsSuccess = false, ErrorMessage = result.Error?.Message };
         }
 
-        public async Task<IEnumerable<Kline>> GetKlinesAsync(string symbol,string timeframe, int limit)
+        public async Task<IEnumerable<Kline>> GetKlinesAsync(string symbol, string timeframe, int limit)
         {
-            var tm = KlineInterval.FifteenMinutes;
-            switch (timeframe)
+            var intervalMap = new Dictionary<string, KlineInterval>
             {
-                case "5":
-                    tm= KlineInterval.FiveMinutes;
-                    break;
-                case "30":
-                    tm = KlineInterval.ThirtyMinutes;
-                    break;
-                case "60":
-                    tm = KlineInterval.OneHour;
-                    break;
-                case "240":
-                    tm = KlineInterval.FourHour;
-                    break;
-                default:
-                    tm = KlineInterval.FifteenMinutes;
-                    break;
-            }
+                ["5"] = KlineInterval.FiveMinutes,
+                ["15"] = KlineInterval.FifteenMinutes,
+                ["30"] = KlineInterval.ThirtyMinutes,
+                ["60"] = KlineInterval.OneHour,
+                ["240"] = KlineInterval.FourHour
+            };
 
-            var result = await _client.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, tm,limit:limit);
-            if (!result.Success)
-            {
+            // اگر تایم‌فریم تعریف نشده بود، پیش‌فرض 15 دقیقه
+            var interval = intervalMap.TryGetValue(timeframe, out var tm) ? tm : KlineInterval.FifteenMinutes;
+
+            var result = await _client.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, interval, limit: limit);
+            if (!result.Success || result.Data == null)
                 return [];
-            }
 
-            // تبدیل داده‌های بایننس به مدل مستقل ما
             return result.Data.Select(k => new Kline
             {
                 OpenTime = k.OpenTime,
@@ -133,6 +122,7 @@ namespace SmartTrader.Infrastructure.Services
                 Volume = k.Volume
             });
         }
+
 
         public async Task<SymbolFilterInfo> GetSymbolFilterInfoAsync(string symbol)
         {

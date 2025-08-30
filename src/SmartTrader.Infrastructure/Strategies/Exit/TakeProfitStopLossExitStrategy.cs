@@ -18,6 +18,7 @@ using SmartTrader.Application.Interfaces.Strategies;
 using SmartTrader.Application.Models;
 using SmartTrader.Domain.Entities;
 using SmartTrader.Domain.Enums;
+using SmartTrader.Infrastructure.Services;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -30,19 +31,22 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
         private readonly IExchangeRepository _exchangeRepo;
         private readonly IStrategyRepository _strategyRepo;
         private readonly IExchangeServiceFactory _exchangeFactory;
+        private readonly ITelegramNotifier _telegramNotifier;   // ✅ اضافه شد
 
         public TakeProfitStopLossExitStrategy(
             ILogger<TakeProfitStopLossExitStrategy> logger,
             IWalletRepository walletRepo,
             IExchangeRepository exchangeRepo,
             IStrategyRepository strategyRepo,
-            IExchangeServiceFactory exchangeFactory)
+            IExchangeServiceFactory exchangeFactory,
+            ITelegramNotifier telegramNotifier)   // ✅ اینجا هم تزریق شد
         {
             _logger = logger;
             _walletRepo = walletRepo;
             _exchangeRepo = exchangeRepo;
             _strategyRepo = strategyRepo;
             _exchangeFactory = exchangeFactory;
+            _telegramNotifier = telegramNotifier;
         }
 
         public async Task<StrategySignal> ExecuteAsync(Position position)
@@ -61,9 +65,10 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             var exchangeService = _exchangeFactory.CreateService(wallet, exchange);
 
             // گرفتن کندل‌های 5 دقیقه‌ای (حداقل 3 کندل برای محاسبه RSI قبل/فعلی)
-            var klines = (await exchangeService.GetKlinesAsync(position.Symbol, TimeFrame.FiveMinute.ToString(), 50)).ToList();
-            if (klines.Count < 5)
+            var klines = (await exchangeService.GetKlinesAsync(position.Symbol, strategy.TimeFrame?.ToString() ?? "5", 50)).ToList();
+            if (klines.Count < 15)
                 return new StrategySignal { Signal = SignalType.Hold, Reason = "Not enough candle data." };
+            //klines.RemoveAt(klines.Count - 1);
 
             // تبدیل به Quote برای محاسبات
             var quotes = klines.Select(k => new Quote
@@ -85,6 +90,9 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             decimal rsiCurr = (decimal)rsi[^1].Rsi!;
 
             _logger.LogInformation("Symbol: {symbol} - RSI: {rsi1} , {rsi}", position.Symbol, Math.Round(rsiPrev, 2), Math.Round(rsiCurr,2));
+            var reason = $"Symbol: {position.Symbol} - RSI: {Math.Round(rsiPrev, 2)} , {Math.Round(rsiCurr, 2)}";
+            await _telegramNotifier.SendNotificationHistoryAsync(reason);   // ✅ ارسال به History
+            // 
             var lastCandle = quotes[^1];
             var prevCandle = quotes[^2];
 
@@ -92,12 +100,21 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             bool isRed = lastCandle.Close < lastCandle.Open;
 
             var candleClose = GetCandleCloseTime(position.OpenTimestamp, 5);
+            
+            // تنظیم استاپ لاس وسط کندل ورود
+            //if (DateTime.UtcNow > candleClose.AddMinutes(1) && position.Stoploss == null)
+            //{
+            //    var stoploss = (prevCandle.Close + prevCandle.Open) / 2;
+            //    return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Set StopLoss => " + position.Symbol + "=SL:" + stoploss, NewStopLossPrice = stoploss };
+            //}
 
+            // تنظیم استاپ لاس ابتدای کندل ورود
             if (DateTime.UtcNow > candleClose.AddMinutes(1) && position.Stoploss == null)
             {
-                var stoploss = (prevCandle.Close + prevCandle.Open) / 2;
-                return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Set StopLoss => " + position.Symbol + "=SL:" + position.Stoploss, NewStopLossPrice = stoploss };
+                var stoploss = prevCandle.Open;
+                return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Set StopLoss => " + position.Symbol + "=SL:" + stoploss, NewStopLossPrice = stoploss };
             }
+
 
             // شرط مدت نگهداری: حداقل تا پایان کندل بعد از ورود
             if (DateTime.UtcNow < candleClose.AddMinutes(5))
@@ -119,7 +136,7 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             }
 
             // ----- استراتژی خروج شورت -----
-            if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
+            if (position.PositionSide.Equals(SignalType.OpenShort.ToString(), StringComparison.OrdinalIgnoreCase))
             {
                 if (rsiCurr - rsiPrev > 5)
                     return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI jumped sharply (>5)." };

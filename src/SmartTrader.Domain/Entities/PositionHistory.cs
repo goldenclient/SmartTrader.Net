@@ -12,6 +12,7 @@ namespace SmartTrader.Domain.Entities
         public decimal? PercentPosition { get; set; }
         public decimal? PercentBalance { get; set; }
         public decimal Price { get; set; }
+        public decimal? Profit { get; set; }
         public DateTime ActionTimestamp { get; set; }
         public string? Description { get; set; }
     }
