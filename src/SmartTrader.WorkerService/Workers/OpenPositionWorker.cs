@@ -143,6 +143,7 @@ namespace SmartTrader.WorkerService.Workers
                                             OpenTimestamp = DateTime.UtcNow,
                                             Stoploss = signal.StopLoss,
                                             TakeProfit = signal.TakeProfit,
+                                            Leverage = signal.Leverage ?? 1
                                         };
                                         await positionRepo.CreateAsync(newPosition);
                                         _logger.LogInformation("Position for {Symbol} on wallet {WalletName} opened.", symbol, wallet.WalletName);

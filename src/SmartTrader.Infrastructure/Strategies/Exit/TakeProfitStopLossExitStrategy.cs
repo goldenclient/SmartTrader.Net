@@ -33,6 +33,7 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
         private readonly IStrategyRepository _strategyRepo;
         private readonly IExchangeServiceFactory _exchangeFactory;
         private readonly ITelegramNotifier _telegramNotifier;   // ✅ اضافه شد
+        private readonly IPositionRepository _positionRepo;
 
         public TakeProfitStopLossExitStrategy(
             ILogger<TakeProfitStopLossExitStrategy> logger,
@@ -40,7 +41,9 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             IExchangeRepository exchangeRepo,
             IStrategyRepository strategyRepo,
             IExchangeServiceFactory exchangeFactory,
-            ITelegramNotifier telegramNotifier)   // ✅ اینجا هم تزریق شد
+            ITelegramNotifier telegramNotifier,   // ✅ اینجا هم تزریق شد
+            IPositionRepository positionRepo)
+
         {
             _logger = logger;
             _walletRepo = walletRepo;
@@ -48,6 +51,8 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             _strategyRepo = strategyRepo;
             _exchangeFactory = exchangeFactory;
             _telegramNotifier = telegramNotifier;
+            _positionRepo = positionRepo;
+
         }
 
         public async Task<StrategySignal> ExecuteAsync(Position position)
@@ -106,15 +111,39 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
 
             // --- 2. محاسبه سود لحظه‌ای ---
             decimal pnlPercentage = 0;
+            decimal priceChangePercentage = 0;
             if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
-                pnlPercentage = (currentPrice - position.EntryPrice) / position.EntryPrice;
+                priceChangePercentage = (currentPrice - position.EntryPrice) / position.EntryPrice;
             else
-                pnlPercentage = (position.EntryPrice - currentPrice) / position.EntryPrice;
-            // pnlPercentage = pnlPercentage * 10; // اعمال لوریج بر روی سود
-            if (pnlPercentage >= 0.01m) //  0.1m)
+                priceChangePercentage = (position.EntryPrice - currentPrice) / position.EntryPrice;
+
+            // اعمال لوریج برای محاسبه سود واقعی
+            int leverage = position.Leverage > 0 ? position.Leverage : 1;
+            pnlPercentage = priceChangePercentage * leverage;
+
+            if (pnlPercentage >= 0.08m) // 8% profit with leverage
             {
-                _logger.LogInformation("Take Profit > 10% triggered for Position {PositionID}. PNL: {pnl}%", position.PositionID, pnlPercentage * 100);
-                return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "Profit exceeded 5%." };
+                var positionHistory = await _positionRepo.GetHistoryByPositionIdAsync(position.PositionID);
+
+                // این شرط را فقط یک بار اجرا می‌کنیم
+                if (!positionHistory.Any(h => h.ActionType == SignalType.ChangeSL && h.Description.Contains("Trailing SL to 5% profit")))
+                {
+                    // محاسبه قیمت جدید حد ضرر بر اساس سود 5% با لوریج
+                    decimal priceChangeFor5PercentProfit = 0.05m / leverage;
+                    decimal newStopLossPrice;
+                    if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
+                        newStopLossPrice = position.EntryPrice * (1 + priceChangeFor5PercentProfit);
+                    else // SHORT
+                        newStopLossPrice = position.EntryPrice * (1 - priceChangeFor5PercentProfit);
+
+                    _logger.LogInformation("Profit > 8% triggered. Moving SL to 5% profit for Position {PositionID}. New SL: {sl}", position.PositionID, newStopLossPrice);
+                    return new StrategySignal
+                    {
+                        Signal = SignalType.ChangeSL,
+                        NewStopLossPrice = newStopLossPrice,
+                        Reason = "Trailing SL to 5% profit"
+                    };
+                }
             }
 
 
