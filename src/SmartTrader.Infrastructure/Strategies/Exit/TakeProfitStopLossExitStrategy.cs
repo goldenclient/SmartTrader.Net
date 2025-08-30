@@ -121,27 +121,27 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             int leverage = position.Leverage > 0 ? position.Leverage : 1;
             pnlPercentage = priceChangePercentage * leverage;
 
-            if (pnlPercentage >= 0.08m) // 8% profit with leverage
+            if (pnlPercentage >= 0.07m) // 8% profit with leverage
             {
                 var positionHistory = await _positionRepo.GetHistoryByPositionIdAsync(position.PositionID);
 
                 // این شرط را فقط یک بار اجرا می‌کنیم
-                if (!positionHistory.Any(h => h.ActionType == SignalType.ChangeSL && h.Description.Contains("Trailing SL to 5% profit")))
+                if (!positionHistory.Any(h => h.ActionType == SignalType.ChangeSL && h.Description.Contains("Trailing SL to 6% profit")))
                 {
                     // محاسبه قیمت جدید حد ضرر بر اساس سود 5% با لوریج
-                    decimal priceChangeFor5PercentProfit = 0.05m / leverage;
+                    decimal priceChangeFor5PercentProfit = 0.06m / leverage;
                     decimal newStopLossPrice;
                     if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
                         newStopLossPrice = position.EntryPrice * (1 + priceChangeFor5PercentProfit);
                     else // SHORT
                         newStopLossPrice = position.EntryPrice * (1 - priceChangeFor5PercentProfit);
 
-                    _logger.LogInformation("Profit > 8% triggered. Moving SL to 5% profit for Position {PositionID}. New SL: {sl}", position.PositionID, newStopLossPrice);
+                    _logger.LogInformation("Profit > 7% triggered. Moving SL to 6% profit for Position {PositionID}. New SL: {sl}", position.PositionID, newStopLossPrice);
                     return new StrategySignal
                     {
                         Signal = SignalType.ChangeSL,
                         NewStopLossPrice = newStopLossPrice,
-                        Reason = "Trailing SL to 5% profit"
+                        Reason = "Trailing SL to 6% profit"
                     };
                 }
             }

@@ -43,8 +43,13 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             var exchangeInfo = coin.GetExchangeInfo().FirstOrDefault(e => e.Exchange.Equals(exchangeName, StringComparison.OrdinalIgnoreCase));
             if (exchangeInfo == null) return new StrategySignal { Reason = "Symbol not found." };
 
-            var marketDataService = _exchangeFactory.CreateService(new Wallet(), new Exchange { ExchangeName = exchangeName });
-
+            var marketDataService = _exchangeFactory.CreateService(
+                   new Wallet
+                   {
+                       ApiKey = "LFoqWEuTZpckOqoMTvVyj0tajAmPtdSAzGd0PpZeCh7P14ZTZHtKwvh0etdQszrL",
+                       SecretKey = "zRYFyQmIKCeNCKhJUIvYX31pTl5fS3LJNhuVHGdzmSoJ9haq1C960DBRbgTAVtpA"
+                   },
+                   new Exchange { ExchangeName = exchangeName });
             var klines = (await marketDataService.GetKlinesAsync(exchangeInfo.Symbol, strategy.TimeFrame?.ToString() ?? "5", 50)).ToList();
 
             // برای تحلیل، حداقل به 4 کندل نیاز داریم
@@ -71,16 +76,16 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             // اگر عمر کندل کمتر از ۲۰ ثانیه باشد، آخرین کندل بسته‌شده را بررسی می‌کنیم
             if (candleAge.TotalSeconds > 0 && candleAge.TotalSeconds < 20)
             {
-                _logger.LogInformation("Current candle for {Symbol} is new ({seconds}s old). Analyzing last *closed* candle for safety.",
-                    exchangeInfo.Symbol, (int)candleAge.TotalSeconds);
+                //_logger.LogInformation("Current candle for {Symbol} is new ({seconds}s old). Analyzing last *closed* candle for safety.",
+                    //exchangeInfo.Symbol, (int)candleAge.TotalSeconds);
                 // کندل هدف: آخرین بسته‌شده (ماقبل آخر). کندل مقایسه: کندل قبل از آن
                 return CheckSignalConditions(quotes[^2], quotes[^3], rsiList[^2], rsiList[^3], strategy, exchangeInfo.Symbol);
             }
             // در غیر این صورت، کندل جاری (بسته نشده) را بررسی می‌کنیم
             else
             {
-                _logger.LogInformation("Current candle for {Symbol} is mature ({seconds}s old). Analyzing *forming* candle for quick reaction.",
-                   exchangeInfo.Symbol, (int)candleAge.TotalSeconds);
+                //_logger.LogInformation("Current candle for {Symbol} is mature ({seconds}s old). Analyzing *forming* candle for quick reaction.",
+                  // exchangeInfo.Symbol, (int)candleAge.TotalSeconds);
                 // کندل هدف: کندل جاری و باز (آخرین). کندل مقایسه: کندل قبل از آن (آخرین بسته‌شده)
                 return CheckSignalConditions(quotes[^1], quotes[^2], rsiList[^1], rsiList[^2], strategy, exchangeInfo.Symbol);
             }
