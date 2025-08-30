@@ -10,6 +10,7 @@
 // - اگر RSI کندل جاری منهای RSI کندل قبل بیشتر از 5 بود خارج شود
 // - اگر RSI کمتر از 20 شد و کندل سبز بود خارج شود
 
+using Binance.Net.Enums;
 using Microsoft.Extensions.Logging;
 using Skender.Stock.Indicators;
 using SmartTrader.Application.Interfaces.Persistence;
@@ -89,7 +90,7 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             decimal rsiPrev = (decimal)rsi[^2].Rsi!;
             decimal rsiCurr = (decimal)rsi[^1].Rsi!;
 
-            _logger.LogInformation("Symbol: {symbol} - RSI: {rsi1} , {rsi}", position.Symbol, Math.Round(rsiPrev, 2), Math.Round(rsiCurr,2));
+            _logger.LogInformation("Symbol: {symbol} - RSI: {rsi1} , {rsi}", position.Symbol, Math.Round(rsiPrev, 2), Math.Round(rsiCurr, 2));
             var reason = $"Symbol: {position.Symbol} - RSI: {Math.Round(rsiPrev, 2)} , {Math.Round(rsiCurr, 2)}";
             await _telegramNotifier.SendNotificationHistoryAsync(reason);   // ✅ ارسال به History
             // 
@@ -100,21 +101,58 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             bool isRed = lastCandle.Close < lastCandle.Open;
 
             var candleClose = GetCandleCloseTime(position.OpenTimestamp, 5);
-            
+
+            var currentPrice = lastCandle.Close;
+
+            // --- 2. محاسبه سود لحظه‌ای ---
+            decimal pnlPercentage = 0;
+            if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
+                pnlPercentage = (currentPrice - position.EntryPrice) / position.EntryPrice;
+            else
+                pnlPercentage = (position.EntryPrice - currentPrice) / position.EntryPrice;
+            // pnlPercentage = pnlPercentage * 10; // اعمال لوریج بر روی سود
+            if (pnlPercentage >= 0.01m) //  0.1m)
+            {
+                _logger.LogInformation("Take Profit > 10% triggered for Position {PositionID}. PNL: {pnl}%", position.PositionID, pnlPercentage * 100);
+                return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "Profit exceeded 5%." };
+            }
+
+
+            if (DateTime.UtcNow > candleClose.AddSeconds(15) &&  position.Stoploss == null)
+            {
+                var body = Math.Abs(prevCandle.Close - prevCandle.Open);
+                if (body > 0) // جلوگیری از تقسیم بر صفر برای کندل‌های دوجی
+                {
+                    if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        var upperShadow = prevCandle.High - Math.Max(prevCandle.Open, prevCandle.Close);
+                        if (upperShadow > body * 0.5m)
+                        {
+                            _logger.LogInformation("Weak candle (long upper shadow) detected for LONG Position {PositionID}", position.PositionID);
+                            return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "Weak candle detected (long upper shadow)." };
+                        }
+                    }
+                    else // SHORT
+                    {
+                        var lowerShadow = Math.Min(prevCandle.Open, prevCandle.Close) - prevCandle.Low;
+                        if (lowerShadow > body * 0.5m)
+                        {
+                            _logger.LogInformation("Weak candle (long lower shadow) detected for SHORT Position {PositionID}", position.PositionID);
+                            return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "Weak candle detected (long lower shadow)." };
+                        }
+                    }
+                }
+                // تنظیم استاپ لاس ابتدای کندل ورود
+                var stoploss = prevCandle.Open;
+                return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Set StopLoss => " + position.Symbol + "=SL:" + stoploss, NewStopLossPrice = stoploss };
+
+            }
             // تنظیم استاپ لاس وسط کندل ورود
             //if (DateTime.UtcNow > candleClose.AddMinutes(1) && position.Stoploss == null)
             //{
             //    var stoploss = (prevCandle.Close + prevCandle.Open) / 2;
             //    return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Set StopLoss => " + position.Symbol + "=SL:" + stoploss, NewStopLossPrice = stoploss };
             //}
-
-            // تنظیم استاپ لاس ابتدای کندل ورود
-            if (DateTime.UtcNow > candleClose.AddMinutes(1) && position.Stoploss == null)
-            {
-                var stoploss = prevCandle.Open;
-                return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Set StopLoss => " + position.Symbol + "=SL:" + stoploss, NewStopLossPrice = stoploss };
-            }
-
 
             // شرط مدت نگهداری: حداقل تا پایان کندل بعد از ورود
             if (DateTime.UtcNow < candleClose.AddMinutes(5))
@@ -132,20 +170,20 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
                     return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI > 80 with red candle." };
 
                 if (lastCandle.Close < position.Stoploss)
-                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "StopLoss, down to midlle first candle" };
+                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "StopLoss, down to open first candle" };
             }
 
             // ----- استراتژی خروج شورت -----
             if (position.PositionSide.Equals(SignalType.OpenShort.ToString(), StringComparison.OrdinalIgnoreCase))
             {
                 if (rsiCurr - rsiPrev > 5)
-                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "RSI jumped sharply (>5)." };
+                    return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI jumped sharply (>5)." };
 
                 if (rsiCurr < 20 && isGreen)
                     return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI < 20 with green candle." };
 
                 if (lastCandle.Close > position.Stoploss)
-                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "StopLoss, up to midlle first candle" };
+                    return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "StopLoss, up to open first candle" };
             }
 
             return new StrategySignal { Signal = SignalType.Hold, Reason = "No exit condition met." };

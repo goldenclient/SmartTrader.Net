@@ -102,8 +102,12 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             bool isGreen = lastCandle.Close > lastCandle.Open;
             bool isRed = lastCandle.Close < lastCandle.Open;
 
+            // شرط جدید: بررسی قدرت کندل
+            var upperShadow = lastCandle.High - Math.Max(lastCandle.Open, lastCandle.Close);
+            var lowerShadow = Math.Min(lastCandle.Open, lastCandle.Close) - lastCandle.Low;
+
             // ---- ورود لانگ ----
-            if (rsiDiffUp > 10 && highVolume && longCandle && isGreen && lastRsi<75)
+            if (rsiDiffUp > 10 && highVolume && longCandle && isGreen && lastRsi < 75 && upperShadow < lastRange * 0.5m)
             {
                 _logger.LogInformation("LONG signal for {Symbol}", exchangeInfo.Symbol);
                 return new StrategySignal
@@ -116,7 +120,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             }
 
             // ---- ورود شورت ----
-            if (rsiDiffDown > 10 && highVolume && longCandle && isRed && lastRsi > 25)
+            if (rsiDiffDown > 10 && highVolume && longCandle && isRed && lastRsi > 25 && lowerShadow < lastRange * 0.5m)
             {
                 _logger.LogInformation("SHORT signal for {Symbol}", exchangeInfo.Symbol);
                 return new StrategySignal
