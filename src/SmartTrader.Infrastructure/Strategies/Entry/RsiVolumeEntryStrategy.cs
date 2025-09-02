@@ -73,7 +73,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             var formingCandleOpenTime = klines.Last().OpenTime;
             var closetile = GetCandleCloseTime(formingCandleOpenTime, strategy.TimeFrame ?? 5);
 
-            if (DateTime.UtcNow > closetile.Date.AddSeconds(-30))
+            if (DateTime.UtcNow > closetile.Date.AddSeconds(-60))
                 return CheckSignalConditions(quotes[^1], quotes[^2], rsiList[^1], rsiList[^2], strategy, exchangeInfo.Symbol);
             return new StrategySignal { Reason = "wait for last 60s of this candle." };
 
@@ -118,7 +118,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             var shortshadow = lowerShadow < currentRange * 0.5m;
 
             // ---- ورود لانگ ----
-            if (rsiDiffUp && highVolume && longCandle && isGreen && currentRsi < 60 && longshadow)
+            if (rsiDiffUp && highVolume && longCandle && isGreen && currentRsi < 50 && longshadow)
             {
                 _logger.LogInformation("LONG signal for {Symbol}", symbol);
                 return new StrategySignal
@@ -131,7 +131,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             }
 
             // --- شرط ورود Short ---
-            if (rsiDiffDown && highVolume && longCandle && isRed && currentRsi > 40 && shortshadow)
+            if (rsiDiffDown && highVolume && longCandle && isRed && currentRsi > 50 && shortshadow)
             {
                 _logger.LogInformation("SHORT signal for {Symbol}", symbol);
                 return new StrategySignal
