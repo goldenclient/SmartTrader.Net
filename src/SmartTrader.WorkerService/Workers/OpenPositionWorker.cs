@@ -56,6 +56,7 @@ namespace SmartTrader.WorkerService.Workers
 
                         foreach (var tradableCoin in tradableCoins)
                         {
+
                             if (!allCoins.TryGetValue(tradableCoin.CoinID, out var coin)) continue;
 
                             // فرض می‌کنیم سیگنال را از صرافی بایننس می‌گیریم
