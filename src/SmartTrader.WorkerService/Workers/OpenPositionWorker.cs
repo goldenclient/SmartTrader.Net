@@ -13,13 +13,13 @@ namespace SmartTrader.WorkerService.Workers
     {
         private readonly ILogger<OpenPositionWorker> _logger;
         private readonly IServiceProvider _serviceProvider;
-        private readonly int _intervalMinutes;
+        private readonly int _intervalSeconds;
 
         public OpenPositionWorker(ILogger<OpenPositionWorker> logger, IServiceProvider serviceProvider, IConfiguration configuration)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
-            _intervalMinutes = configuration.GetValue<int>("WorkerSettings:OpenPositionWorkerIntervalMinutes", 60);
+            _intervalSeconds = configuration.GetValue<int>("WorkerSettings:OpenPositionWorkerIntervalSeconds", 60);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -67,7 +67,6 @@ namespace SmartTrader.WorkerService.Workers
                             // 2. اگر سیگنالی وجود داشت، آن را روی تمام ولت‌های واجد شرایط اعمال کن
                             if (signal.Signal == SignalType.OpenLong || signal.Signal == SignalType.OpenShort)
                             {
-                                await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, "SIGNAL", 0);
                                 _logger.LogInformation("Signal {Signal} for {CoinName} received. Notifying and applying to eligible wallets.", signal.Signal, coin.CoinName);
                                 //await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, "Strategy", 0);
 
@@ -86,6 +85,7 @@ namespace SmartTrader.WorkerService.Workers
                                     string symbol = exchangeInfo.Symbol;
                                     if (await positionRepo.HasOpenPositionAsync(wallet.WalletID, symbol, strategy.StrategyID))
                                     {
+                                        await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName+"-AlreadyOpen", 0);
                                         //signal.Reason = signal.Reason+"\nNot Open ==> Strategy HasOpen";
                                         //await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName, 0);
                                         continue; // این ولت برای این کوین پوزیشن باز دارد
@@ -110,6 +110,7 @@ namespace SmartTrader.WorkerService.Workers
                                     // 3. اعتبارسنجی و تنظیم حجم معامله بر اساس قوانین صرافی
                                     if (initialQuantity < filterInfo.MinQuantity)
                                     {
+                                        await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName+ "-MinQuantity", lastPrice);
                                         _logger.LogWarning("Calculated quantity {Quantity} is less than MinQuantity {MinQuantity} for {Symbol}. Skipping trade.", initialQuantity, filterInfo.MinQuantity, symbol);
                                         continue;
                                     }
@@ -118,10 +119,11 @@ namespace SmartTrader.WorkerService.Workers
                                     signal.Quantity = adjustedQuantity;
                                     // ارسال کل آبجکت سیگنال به سرویس صرافی
                                     var openResult = await exchangeService.OpenPositionAsync(signal);
-                                    await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName, lastPrice);
                                     if (openResult.IsSuccess)
                                     {
                                         // انتخاب استراتژی خروج
+                                        await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName, lastPrice);
+
                                         int? exitStrategyId = wallet.ForceExitStrategyID ?? defaultExitStrategy?.StrategyID;
                                         if (!exitStrategyId.HasValue)
                                         {
@@ -149,7 +151,10 @@ namespace SmartTrader.WorkerService.Workers
                                         _logger.LogInformation("Position for {Symbol} on wallet {WalletName} opened.", symbol, wallet.WalletName);
                                     }
                                     else
-                                        _logger.LogInformation("Position for {Symbol} on wallet {WalletName} Error:{WalletName}", symbol, wallet.WalletName,openResult.ErrorMessage);
+                                    {
+                                        await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName + "-" + openResult.ErrorMessage, lastPrice);
+                                        _logger.LogInformation("Position for {Symbol} on wallet {WalletName} Error:{WalletName}", symbol, wallet.WalletName, openResult.ErrorMessage);
+                                    }
                                 }
                             }
                         }
@@ -157,7 +162,7 @@ namespace SmartTrader.WorkerService.Workers
                 }
 
 
-                await Task.Delay(TimeSpan.FromMinutes(_intervalMinutes), stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(_intervalSeconds), stoppingToken);
             }
         }
 

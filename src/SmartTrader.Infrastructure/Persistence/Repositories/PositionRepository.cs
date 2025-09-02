@@ -16,8 +16,8 @@ namespace SmartTrader.Infrastructure.Persistence.Repositories
         public async Task<Position> CreateAsync(Position position)
         {
             const string sql = @"
-                INSERT INTO Positions (WalletID, CoinID, EntryStrategyID, ExitStrategyID, Symbol, PositionSide, Status, EntryPrice, EntryValueUSD, CurrentQuantity, OpenTimestamp)
-                VALUES (@WalletID, @CoinID, @EntryStrategyID, @ExitStrategyID, @Symbol, @PositionSide, @Status, @EntryPrice, @EntryValueUSD, @CurrentQuantity, @OpenTimestamp);
+                INSERT INTO Positions (WalletID, CoinID, EntryStrategyID, ExitStrategyID, Symbol, PositionSide, Status, EntryPrice, EntryValueUSD, CurrentQuantity, OpenTimestamp, Leverage)
+                VALUES (@WalletID, @CoinID, @EntryStrategyID, @ExitStrategyID, @Symbol, @PositionSide, @Status, @EntryPrice, @EntryValueUSD, @CurrentQuantity, @OpenTimestamp, @Leverage);
                 SELECT CAST(SCOPE_IDENTITY() as int)";
 
             using var connection = CreateConnection();
@@ -76,8 +76,8 @@ namespace SmartTrader.Infrastructure.Persistence.Repositories
         public async Task AddHistoryAsync(PositionHistory history)
         {
             const string sql = @"
-        INSERT INTO PositionHistory (PositionID, ActionType, PercentPosition, PercentBalance, Price, ActionTimestamp, Description)
-        VALUES (@PositionID, @ActionType, @PercentPosition, @PercentBalance, @Price, @ActionTimestamp, @Description);";
+        INSERT INTO PositionHistory (PositionID, ActionType, PercentPosition, PercentBalance, Price, ActionTimestamp, Description, Profit)
+        VALUES (@PositionID, @ActionType, @PercentPosition, @PercentBalance, @Price, @ActionTimestamp, @Description, @Profit);";
             using var connection = CreateConnection();
             await connection.ExecuteAsync(sql, history);
         }

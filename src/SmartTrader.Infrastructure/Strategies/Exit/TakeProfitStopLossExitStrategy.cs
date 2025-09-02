@@ -121,58 +121,124 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             int leverage = position.Leverage > 0 ? position.Leverage : 1;
             pnlPercentage = priceChangePercentage * leverage;
 
-            if (pnlPercentage >= 0.07m) // 8% profit with leverage
+            if (pnlPercentage >= 0.1m) // 8% profit with leverage
             {
+                //return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "Trailing SL to 5% profit" };
                 var positionHistory = await _positionRepo.GetHistoryByPositionIdAsync(position.PositionID);
 
                 // این شرط را فقط یک بار اجرا می‌کنیم
-                if (!positionHistory.Any(h => h.ActionType == SignalType.ChangeSL && h.Description.Contains("Trailing SL to 6% profit")))
+                if (!positionHistory.Any(h => h.ActionType == SignalType.ChangeSL && h.Description.Contains("Trailing SL to 10% profit")))
                 {
                     // محاسبه قیمت جدید حد ضرر بر اساس سود 5% با لوریج
-                    decimal priceChangeFor5PercentProfit = 0.06m / leverage;
+                    decimal priceChangeFor5PercentProfit = 0.09m / leverage;
                     decimal newStopLossPrice;
                     if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
                         newStopLossPrice = position.EntryPrice * (1 + priceChangeFor5PercentProfit);
                     else // SHORT
                         newStopLossPrice = position.EntryPrice * (1 - priceChangeFor5PercentProfit);
 
-                    _logger.LogInformation("Profit > 7% triggered. Moving SL to 6% profit for Position {PositionID}. New SL: {sl}", position.PositionID, newStopLossPrice);
+                    _logger.LogInformation("Profit > 10% triggered. Moving SL to 9% profit for Position {PositionID}. New SL: {sl}", position.PositionID, newStopLossPrice);
                     return new StrategySignal
                     {
                         Signal = SignalType.ChangeSL,
                         NewStopLossPrice = newStopLossPrice,
-                        Reason = "Trailing SL to 6% profit"
+                        Reason = "Trailing SL to 10% profit"
+                    };
+                }
+            }
+            else if (pnlPercentage >= 0.05m) // 8% profit with leverage
+            {
+                //return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "Trailing SL to 5% profit" };
+                var positionHistory = await _positionRepo.GetHistoryByPositionIdAsync(position.PositionID);
+
+                // این شرط را فقط یک بار اجرا می‌کنیم
+                if (!positionHistory.Any(h => h.ActionType == SignalType.ChangeSL && h.Description.Contains("Trailing SL to 5% profit")))
+                {
+                    // محاسبه قیمت جدید حد ضرر بر اساس سود 5% با لوریج
+                    decimal priceChangeFor5PercentProfit = 0.04m / leverage;
+                    decimal newStopLossPrice;
+                    if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
+                        newStopLossPrice = position.EntryPrice * (1 + priceChangeFor5PercentProfit);
+                    else // SHORT
+                        newStopLossPrice = position.EntryPrice * (1 - priceChangeFor5PercentProfit);
+
+                    _logger.LogInformation("Profit > 5% triggered. Moving SL to 4% profit for Position {PositionID}. New SL: {sl}", position.PositionID, newStopLossPrice);
+                    return new StrategySignal
+                    {
+                        Signal = SignalType.ChangeSL,
+                        NewStopLossPrice = newStopLossPrice,
+                        Reason = "Trailing SL to 5% profit"
+                    };
+                }
+            }
+            else if (pnlPercentage >= 0.025m) // 8% profit with leverage
+            {
+                //return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "Trailing SL to 5% profit" };
+
+                var positionHistory = await _positionRepo.GetHistoryByPositionIdAsync(position.PositionID);
+
+                // این شرط را فقط یک بار اجرا می‌کنیم
+                if (!positionHistory.Any(h => h.ActionType == SignalType.ChangeSL && h.Description.Contains("Trailing SL to 2.5% profit")))
+                {
+                    // محاسبه قیمت جدید حد ضرر بر اساس سود 5% با لوریج
+                    decimal priceChangeFor5PercentProfit = 0.01m / leverage;
+                    decimal newStopLossPrice;
+                    if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
+                        newStopLossPrice = position.EntryPrice * (1 + priceChangeFor5PercentProfit);
+                    else // SHORT
+                        newStopLossPrice = position.EntryPrice * (1 - priceChangeFor5PercentProfit);
+
+                    _logger.LogInformation("Profit > 2.5% triggered. Moving SL to 1% profit for Position {PositionID}. New SL: {sl}", position.PositionID, newStopLossPrice);
+                    return new StrategySignal
+                    {
+                        Signal = SignalType.ChangeSL,
+                        NewStopLossPrice = newStopLossPrice,
+                        Reason = "Trailing SL to 2.5% profit"
                     };
                 }
             }
 
-
-            if (DateTime.UtcNow > candleClose.AddSeconds(15) &&  position.Stoploss == null)
+            //var curclosecandle = GetCandleCloseTime(klines.Last().OpenTime, 5);
+            //if (DateTime.UtcNow > candleClose.AddSeconds(10) && DateTime.UtcNow > curclosecandle.AddSeconds(-60) && position.Stoploss == null)
+            if (DateTime.UtcNow > candleClose.AddSeconds(10) && position.Stoploss == null)
             {
-                var body = Math.Abs(prevCandle.Close - prevCandle.Open);
-                if (body > 0) // جلوگیری از تقسیم بر صفر برای کندل‌های دوجی
-                {
-                    if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
-                    {
-                        var upperShadow = prevCandle.High - Math.Max(prevCandle.Open, prevCandle.Close);
-                        if (upperShadow > body * 0.5m)
-                        {
-                            _logger.LogInformation("Weak candle (long upper shadow) detected for LONG Position {PositionID}", position.PositionID);
-                            return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "Weak candle detected (long upper shadow)." };
-                        }
-                    }
-                    else // SHORT
-                    {
-                        var lowerShadow = Math.Min(prevCandle.Open, prevCandle.Close) - prevCandle.Low;
-                        if (lowerShadow > body * 0.5m)
-                        {
-                            _logger.LogInformation("Weak candle (long lower shadow) detected for SHORT Position {PositionID}", position.PositionID);
-                            return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "Weak candle detected (long lower shadow)." };
-                        }
-                    }
-                }
-                // تنظیم استاپ لاس ابتدای کندل ورود
                 var stoploss = prevCandle.Open;
+
+                // اگر لانگ بود و توی سود بود استاپ وسط کندل ابتدایی
+                // وگر نه استاپ در شروع کندل
+                //if ((isGreen && position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
+                //    || (isRed && position.PositionSide.Equals(SignalType.OpenShort.ToString(), StringComparison.OrdinalIgnoreCase)))
+                //{
+                //    stoploss = (prevCandle.Close + prevCandle.Open) / 2;
+                //    _logger.LogInformation("profit in Position {PositionID} and set StopLoss to midlle", position.PositionID);
+                //}
+                //var body = Math.Abs(prevCandle.Close - prevCandle.Open);
+                //if (body > 0) // جلوگیری از تقسیم بر صفر برای کندل‌های دوجی
+                //{
+                //    // تنظیم استاپ لاس ابتدای کندل ورود
+
+                //    if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
+                //    {
+                //        var upperShadow = prevCandle.High - Math.Max(prevCandle.Open, prevCandle.Close);
+                //        if (upperShadow > body * 0.5m)
+                //        {
+                //            _logger.LogInformation("Weak candle (long upper shadow) detected for LONG Position {PositionID} and StopLoss to midlle", position.PositionID);
+                //            //return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "Weak candle detected (long upper shadow)." };
+                //            stoploss = (prevCandle.Close + prevCandle.Open) / 2;
+                //        }
+
+                //    }
+                //    else // SHORT
+                //    {
+                //        var lowerShadow = Math.Min(prevCandle.Open, prevCandle.Close) - prevCandle.Low;
+                //        if (lowerShadow > body * 0.5m)
+                //        {
+                //            _logger.LogInformation("Weak candle (long lower shadow) detected for SHORT Position {PositionID} and StopLoss to midlle", position.PositionID);
+                //            stoploss = (prevCandle.Close + prevCandle.Open) / 2;
+                //            //return new StrategySignal { Signal = SignalType.CloseBySL, Reason = "Weak candle detected (long lower shadow)." };
+                //        }
+                //    }
+                //}
                 return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Set StopLoss => " + position.Symbol + "=SL:" + stoploss, NewStopLossPrice = stoploss };
 
             }
@@ -184,15 +250,16 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             //}
 
             // شرط مدت نگهداری: حداقل تا پایان کندل بعد از ورود
-            if (DateTime.UtcNow < candleClose.AddMinutes(5))
-            {
-                return new StrategySignal { Signal = SignalType.Hold, Reason = "Minimum holding period not reached." };
-            }
+            //if (DateTime.UtcNow < candleClose.AddMinutes(5))
+            //{
+            //    return new StrategySignal { Signal = SignalType.Hold, Reason = "Minimum holding period not reached." };
+            //}
+            position.ProfitUSD = pnlPercentage;
 
             // ----- استراتژی خروج لانگ -----
             if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
             {
-                if (rsiPrev - rsiCurr > 5)
+                if (rsiPrev - rsiCurr > 5 && position.ProfitUSD>0)
                     return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI dropped sharply (>5)." };
 
                 if (rsiCurr > 80 && isRed)
@@ -205,7 +272,7 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             // ----- استراتژی خروج شورت -----
             if (position.PositionSide.Equals(SignalType.OpenShort.ToString(), StringComparison.OrdinalIgnoreCase))
             {
-                if (rsiCurr - rsiPrev > 5)
+                if (rsiCurr - rsiPrev > 5 && position.ProfitUSD > 0)
                     return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI jumped sharply (>5)." };
 
                 if (rsiCurr < 20 && isGreen)
