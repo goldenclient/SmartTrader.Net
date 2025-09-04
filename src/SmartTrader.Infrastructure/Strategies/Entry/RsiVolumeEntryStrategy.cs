@@ -50,7 +50,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
                        SecretKey = "zRYFyQmIKCeNCKhJUIvYX31pTl5fS3LJNhuVHGdzmSoJ9haq1C960DBRbgTAVtpA"
                    },
                    new Exchange { ExchangeName = exchangeName });
-            var klines = (await marketDataService.GetKlinesAsync(exchangeInfo.Symbol, strategy.TimeFrame?.ToString() ?? "5", 25)).ToList();
+            var klines = (await marketDataService.GetKlinesAsync(exchangeInfo.Symbol, strategy.TimeFrame?.ToString() ?? "15", 25)).ToList();
 
             // برای تحلیل، حداقل به 4 کندل نیاز داریم
             if (klines.Count < 25) return new StrategySignal { Reason = "Not enough kline data for analysis." };
@@ -71,11 +71,11 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             // --- منطق جدید و اصلاح‌شده: تصمیم‌گیری بر اساس سن کندل در حال تشکیل ---
             // آخرین کندل در لیست، کندل در حال تشکیل است
             var formingCandleOpenTime = klines.Last().OpenTime;
-            var closetile = GetCandleCloseTime(formingCandleOpenTime, strategy.TimeFrame ?? 5);
+           // var closetile = GetCandleCloseTime(formingCandleOpenTime, strategy.TimeFrame ?? 15);
 
-            if (DateTime.UtcNow > closetile.Date.AddSeconds(-60))
+            //if (DateTime.UtcNow > closetile.AddMinutes(-3))
                 return CheckSignalConditions(quotes[^1], quotes[^2], rsiList[^1], rsiList[^2], strategy, exchangeInfo.Symbol);
-            return new StrategySignal { Reason = "wait for last 60s of this candle." };
+            //return new StrategySignal { Reason = "wait for last 60s of this candle." };
 
             //var candleAge = DateTime.UtcNow - formingCandleOpenTime;
             //// اگر عمر کندل کمتر از ۲۰ ثانیه باشد، آخرین کندل بسته‌شده را بررسی می‌کنیم
@@ -118,7 +118,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             var shortshadow = lowerShadow < currentRange * 0.5m;
 
             // ---- ورود لانگ ----
-            if (rsiDiffUp && highVolume && longCandle && isGreen && currentRsi < 50 && longshadow)
+            if (rsiDiffUp && highVolume && longCandle && isGreen && currentRsi < 60 && longshadow)
             {
                 _logger.LogInformation("LONG signal for {Symbol}", symbol);
                 return new StrategySignal
@@ -131,7 +131,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             }
 
             // --- شرط ورود Short ---
-            if (rsiDiffDown && highVolume && longCandle && isRed && currentRsi > 50 && shortshadow)
+            if (rsiDiffDown && highVolume && longCandle && isRed && currentRsi > 40 && shortshadow)
             {
                 _logger.LogInformation("SHORT signal for {Symbol}", symbol);
                 return new StrategySignal
@@ -146,14 +146,14 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             return new StrategySignal { Reason = "No signal condition met on the analyzed candle." };
         }
 
-        private static DateTime GetCandleCloseTime(DateTime openTime, int timeframeMinutes = 5)
-        {
-            var totalMinutes = openTime.Hour * 60 + openTime.Minute;
-            var currentCandle = totalMinutes / timeframeMinutes;
-            var closeMinutes = (currentCandle + 1) * timeframeMinutes;
+        //private static DateTime GetCandleCloseTime(DateTime openTime, int timeframeMinutes = 15)
+        //{
+        //    var totalMinutes = openTime.Hour * 60 + openTime.Minute;
+        //    var currentCandle = totalMinutes / timeframeMinutes;
+        //    var closeMinutes = (currentCandle + 1) * timeframeMinutes;
 
-            return openTime.Date.AddMinutes(closeMinutes);
-        }
+        //    return openTime.Date.AddMinutes(closeMinutes);
+        //}
 
         //public async Task<StrategySignal> GetSignalAsync(Coin coin, Strategy strategy, string exchangeName)
         //{

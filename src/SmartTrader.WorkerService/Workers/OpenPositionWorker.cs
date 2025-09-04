@@ -27,7 +27,6 @@ namespace SmartTrader.WorkerService.Workers
             while (!stoppingToken.IsCancellationRequested)
             {
                 _logger.LogInformation("OpenPositionWorker running at: {time}", DateTimeOffset.Now);
-
                 using (var scope = _serviceProvider.CreateScope())
                 {
                     var positionRepo = scope.ServiceProvider.GetRequiredService<IPositionRepository>();
@@ -51,118 +50,121 @@ namespace SmartTrader.WorkerService.Workers
 
                     foreach (var strategy in entryStrategies)
                     {
-                        var tradableCoins = await strategyRepo.GetTradableCoinsByStrategyIdAsync(strategy.StrategyID);
-                        var strategyHandler = strategyFactory.CreateEntryStrategy(strategy);
-
-                        foreach (var tradableCoin in tradableCoins)
+                        if (DateTime.UtcNow < (GetNextQuarterHour(strategy.TimeFrame??15).AddMinutes(-((strategy.TimeFrame ?? 15)/5))))
                         {
+                            var tradableCoins = await strategyRepo.GetTradableCoinsByStrategyIdAsync(strategy.StrategyID);
+                            var strategyHandler = strategyFactory.CreateEntryStrategy(strategy);
 
-                            if (!allCoins.TryGetValue(tradableCoin.CoinID, out var coin)) continue;
-
-                            // فرض می‌کنیم سیگنال را از صرافی بایننس می‌گیریم
-                            string signalExchange = "binance";
-
-                            // 1. دریافت سیگنال یک بار برای هر کوین
-                            var signal = await strategyHandler.GetSignalAsync(coin, strategy, signalExchange);
-
-                            // 2. اگر سیگنالی وجود داشت، آن را روی تمام ولت‌های واجد شرایط اعمال کن
-                            if (signal.Signal == SignalType.OpenLong || signal.Signal == SignalType.OpenShort)
+                            foreach (var tradableCoin in tradableCoins)
                             {
-                                _logger.LogInformation("Signal {Signal} for {CoinName} received. Notifying and applying to eligible wallets.", signal.Signal, coin.CoinName);
-                                //await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, "Strategy", 0);
 
-                                //continue;
-                                foreach (var wallet in wallets)
+                                if (!allCoins.TryGetValue(tradableCoin.CoinID, out var coin)) continue;
+
+                                // فرض می‌کنیم سیگنال را از صرافی بایننس می‌گیریم
+                                string signalExchange = "binance";
+
+                                // 1. دریافت سیگنال یک بار برای هر کوین
+                                var signal = await strategyHandler.GetSignalAsync(coin, strategy, signalExchange);
+
+                                // 2. اگر سیگنالی وجود داشت، آن را روی تمام ولت‌های واجد شرایط اعمال کن
+                                if (signal.Signal == SignalType.OpenLong || signal.Signal == SignalType.OpenShort)
                                 {
-                                    if (!exchanges.TryGetValue(wallet.ExchangeID, out var exchange) ||
-                                        !exchange.ExchangeName.Equals(signalExchange, StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        continue; // این ولت مربوط به صرافی مورد نظر نیست
-                                    }
+                                    _logger.LogInformation("Signal {Signal} for {CoinName} received. Notifying and applying to eligible wallets.", signal.Signal, coin.CoinName);
+                                    //await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, "Strategy", 0);
 
-                                    var exchangeInfo = coin.GetExchangeInfo().FirstOrDefault(e => e.Exchange.Equals(exchange.ExchangeName, StringComparison.OrdinalIgnoreCase));
-                                    if (exchangeInfo == null) continue;
-
-                                    string symbol = exchangeInfo.Symbol;
-                                    if (await positionRepo.HasOpenPositionAsync(wallet.WalletID, symbol, strategy.StrategyID))
+                                    //continue;
+                                    foreach (var wallet in wallets)
                                     {
-                                        await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName+"-AlreadyOpen", 0);
-                                        //signal.Reason = signal.Reason+"\nNot Open ==> Strategy HasOpen";
-                                        //await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName, 0);
-                                        continue; // این ولت برای این کوین پوزیشن باز دارد
-                                        // این ولت برای این استراتژی (فقط استراتژی هایی که onlyones=1 است)، پوزیشن باز دارد
-                                    }
-
-                                    // 3. اجرای معامله بر اساس پارامترهای سیگنال
-                                    var exchangeService = exchangeFactory.CreateService(wallet, exchange);
-                                    var filterInfo = await exchangeService.GetSymbolFilterInfoAsync(symbol);
-                                    if (filterInfo == null)
-                                    {
-                                        _logger.LogWarning("Could not retrieve symbol filters for {Symbol}. Skipping trade.", symbol);
-                                        continue;
-                                    }
-                                    var balance = await exchangeService.GetFreeBalanceAsync();
-                                    var positionValue = balance * (signal.PercentBalance ?? 5.0m) / 100;
-                                    var lastPrice = await exchangeService.GetLastPriceAsync(symbol);
-                                    if (lastPrice == 0) continue;
-
-                                    var initialQuantity = positionValue / lastPrice;
-                                    initialQuantity = initialQuantity * (signal.Leverage ?? 1);
-                                    // 3. اعتبارسنجی و تنظیم حجم معامله بر اساس قوانین صرافی
-                                    if (initialQuantity < filterInfo.MinQuantity)
-                                    {
-                                        await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName+ "-MinQuantity", lastPrice);
-                                        _logger.LogWarning("Calculated quantity {Quantity} is less than MinQuantity {MinQuantity} for {Symbol}. Skipping trade.", initialQuantity, filterInfo.MinQuantity, symbol);
-                                        continue;
-                                    }
-                                    var adjustedQuantity = AdjustToStepSize(initialQuantity, filterInfo.StepSize);
-                                    signal.Symbol = symbol;
-                                    signal.Quantity = adjustedQuantity;
-                                    // ارسال کل آبجکت سیگنال به سرویس صرافی
-                                    var openResult = await exchangeService.OpenPositionAsync(signal);
-                                    if (openResult.IsSuccess)
-                                    {
-                                        // انتخاب استراتژی خروج
-                                        await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName, lastPrice);
-
-                                        int? exitStrategyId = wallet.ForceExitStrategyID ?? defaultExitStrategy?.StrategyID;
-                                        if (!exitStrategyId.HasValue)
+                                        if (!exchanges.TryGetValue(wallet.ExchangeID, out var exchange) ||
+                                            !exchange.ExchangeName.Equals(signalExchange, StringComparison.OrdinalIgnoreCase))
                                         {
-                                            _logger.LogWarning("No exit strategy could be assigned for new position on wallet {WalletName}.", wallet.WalletName);
+                                            continue; // این ولت مربوط به صرافی مورد نظر نیست
                                         }
-                                        var newPosition = new Position
+
+                                        var exchangeInfo = coin.GetExchangeInfo().FirstOrDefault(e => e.Exchange.Equals(exchange.ExchangeName, StringComparison.OrdinalIgnoreCase));
+                                        if (exchangeInfo == null) continue;
+
+                                        string symbol = exchangeInfo.Symbol;
+                                        if (await positionRepo.HasOpenPositionAsync(wallet.WalletID, symbol, strategy.StrategyID))
                                         {
-                                            WalletID = wallet.WalletID,
-                                            CoinID = coin.CoinID,
-                                            EntryStrategyID = strategy.StrategyID,
-                                            ExitStrategyID = exitStrategyId, // منطق جدید
-                                            OrderId = openResult.OrderId,
-                                            Symbol = symbol,
-                                            PositionSide = signal.Signal.ToString(),
-                                            Status = PositionStatus.Open.ToString(), // استفاده از Enum
-                                            EntryPrice = lastPrice,
-                                            EntryValueUSD = positionValue,
-                                            CurrentQuantity = openResult.Quantity,
-                                            OpenTimestamp = DateTime.UtcNow,
-                                            Stoploss = signal.StopLoss,
-                                            TakeProfit = signal.TakeProfit,
-                                            Leverage = strategy.Leverage ?? 1
-                                        };
-                                        await positionRepo.CreateAsync(newPosition);
-                                        _logger.LogInformation("Position for {Symbol} on wallet {WalletName} opened.", symbol, wallet.WalletName);
-                                    }
-                                    else
-                                    {
-                                        await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName + "-" + openResult.ErrorMessage, lastPrice);
-                                        _logger.LogInformation("Position for {Symbol} on wallet {WalletName} Error:{WalletName}", symbol, wallet.WalletName, openResult.ErrorMessage);
+                                            await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName + "-AlreadyOpen", 0);
+                                            //signal.Reason = signal.Reason+"\nNot Open ==> Strategy HasOpen";
+                                            //await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName, 0);
+                                            continue; // این ولت برای این کوین پوزیشن باز دارد
+                                                      // این ولت برای این استراتژی (فقط استراتژی هایی که onlyones=1 است)، پوزیشن باز دارد
+                                        }
+
+                                        // 3. اجرای معامله بر اساس پارامترهای سیگنال
+                                        var exchangeService = exchangeFactory.CreateService(wallet, exchange);
+                                        var filterInfo = await exchangeService.GetSymbolFilterInfoAsync(symbol);
+                                        if (filterInfo == null)
+                                        {
+                                            _logger.LogWarning("Could not retrieve symbol filters for {Symbol}. Skipping trade.", symbol);
+                                            continue;
+                                        }
+                                        var balance = await exchangeService.GetFreeBalanceAsync();
+                                        var positionValue = balance * (signal.PercentBalance ?? 5.0m) / 100;
+                                        if (balance < 5) positionValue = balance * 98 / 100;
+                                        var lastPrice = await exchangeService.GetLastPriceAsync(symbol);
+                                        if (lastPrice == 0) continue;
+
+                                        var initialQuantity = positionValue / lastPrice;
+                                        initialQuantity = initialQuantity * (signal.Leverage ?? 1);
+                                        // 3. اعتبارسنجی و تنظیم حجم معامله بر اساس قوانین صرافی
+                                        if (initialQuantity < filterInfo.MinQuantity)
+                                        {
+                                            await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName + "-MinQuantity", lastPrice);
+                                            _logger.LogWarning("Calculated quantity {Quantity} is less than MinQuantity {MinQuantity} for {Symbol}. Skipping trade.", initialQuantity, filterInfo.MinQuantity, symbol);
+                                            continue;
+                                        }
+                                        var adjustedQuantity = AdjustToStepSize(initialQuantity, filterInfo.StepSize);
+                                        signal.Symbol = symbol;
+                                        signal.Quantity = adjustedQuantity;
+                                        // ارسال کل آبجکت سیگنال به سرویس صرافی
+                                        var openResult = await exchangeService.OpenPositionAsync(signal);
+                                        if (openResult.IsSuccess)
+                                        {
+                                            // انتخاب استراتژی خروج
+                                            await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName, lastPrice);
+
+                                            int? exitStrategyId = wallet.ForceExitStrategyID ?? defaultExitStrategy?.StrategyID;
+                                            if (!exitStrategyId.HasValue)
+                                            {
+                                                _logger.LogWarning("No exit strategy could be assigned for new position on wallet {WalletName}.", wallet.WalletName);
+                                            }
+                                            var newPosition = new Position
+                                            {
+                                                WalletID = wallet.WalletID,
+                                                CoinID = coin.CoinID,
+                                                EntryStrategyID = strategy.StrategyID,
+                                                ExitStrategyID = exitStrategyId, // منطق جدید
+                                                OrderId = openResult.OrderId,
+                                                Symbol = symbol,
+                                                PositionSide = signal.Signal.ToString(),
+                                                Status = PositionStatus.Open.ToString(), // استفاده از Enum
+                                                EntryPrice = lastPrice,
+                                                EntryValueUSD = positionValue,
+                                                CurrentQuantity = openResult.Quantity,
+                                                OpenTimestamp = DateTime.UtcNow,
+                                                Stoploss = signal.StopLoss,
+                                                TakeProfit = signal.TakeProfit,
+                                                Leverage = strategy.Leverage ?? 1
+                                            };
+                                            await positionRepo.CreateAsync(newPosition);
+                                            _logger.LogInformation("Position for {Symbol} on wallet {WalletName} opened.", symbol, wallet.WalletName);
+                                        }
+                                        else
+                                        {
+                                            await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName + "-" + openResult.ErrorMessage, lastPrice);
+                                            _logger.LogInformation("Position for {Symbol} on wallet {WalletName} Error:{WalletName}", symbol, wallet.WalletName, openResult.ErrorMessage);
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+
                 }
-
-
                 await Task.Delay(TimeSpan.FromSeconds(_intervalSeconds), stoppingToken);
             }
         }
@@ -176,6 +178,24 @@ namespace SmartTrader.WorkerService.Workers
             // تعداد گام‌ها را محاسبه کرده و به پایین گرد می‌کنیم، سپس در اندازه گام ضرب می‌کنیم
             // این کار تضمین می‌کند که مقدار نهایی مضربی از stepSize و کوچکتر یا مساوی مقدار اولیه است
             return Math.Floor(quantity / stepSize) * stepSize;
+        }
+
+        static DateTime GetNextQuarterHour(int timeframr)
+        {
+            DateTime dt = DateTime.Now;
+            int minutesToAdd = timeframr - (dt.Minute % timeframr);
+            if (minutesToAdd == timeframr) minutesToAdd = 0; // اگر دقیقا مضرب باشه
+
+            DateTime result = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, 0);
+            result = result.AddMinutes(minutesToAdd);
+
+            // اگر ثانیه‌ها یا میلی‌ثانیه‌ها بیشتر از صفر بودن، باید به مضرب بعدی بره
+            if (dt.Second > 0 || dt.Millisecond > 0)
+            {
+                result = result.AddMinutes(timeframr);
+            }
+
+            return result;
         }
 
     }

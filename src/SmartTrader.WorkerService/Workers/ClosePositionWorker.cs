@@ -102,13 +102,13 @@ namespace SmartTrader.WorkerService.Workers
                         case SignalType.PartialClose:
                             if (signal.PartialPercent.HasValue && signal.PartialPercent > 0)
                             {
-                                decimal quantityToClose = position.CurrentQuantity * (signal.PartialPercent.Value / 100);
+                                decimal quantityToClose = position.CurrentQuantity * (signal.PartialPercent.Value / 100m);
                                 var filterInfo = await exchangeService.GetSymbolFilterInfoAsync(position.Symbol);
                                 if (filterInfo != null) quantityToClose = Math.Floor(quantityToClose / filterInfo.StepSize) * filterInfo.StepSize;
 
                                 if (quantityToClose > 0)
                                 {
-                                    var sellResult = await exchangeService.ModifyPositionAsync(position.Symbol, "SELL", quantityToClose);
+                                    var sellResult = await exchangeService.ModifyPositionAsync(position.Symbol, SignalType.OpenLong.ToString(), quantityToClose);
                                     if (sellResult.IsSuccess)
                                     {
                                         decimal realizedProfit = (actionPrice - position.EntryPrice) * sellResult.Quantity * (position.PositionSide == SignalType.OpenLong.ToString() ? 1 : -1);
