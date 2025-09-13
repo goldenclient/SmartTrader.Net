@@ -118,7 +118,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             var shortshadow = lowerShadow < currentRange * 0.5m;
 
             // ---- ورود لانگ ----
-            if (rsiDiffUp && highVolume && longCandle && isGreen && currentRsi < 60 && longshadow)
+            if (rsiDiffUp && highVolume && longCandle && isGreen && currentRsi < 63 && longshadow)
             {
                 _logger.LogInformation("LONG signal for {Symbol}", symbol);
                 return new StrategySignal
@@ -131,7 +131,7 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
             }
 
             // --- شرط ورود Short ---
-            if (rsiDiffDown && highVolume && longCandle && isRed && currentRsi > 40 && shortshadow)
+            if (rsiDiffDown && highVolume && longCandle && isRed && currentRsi > 37 && shortshadow)
             {
                 _logger.LogInformation("SHORT signal for {Symbol}", symbol);
                 return new StrategySignal

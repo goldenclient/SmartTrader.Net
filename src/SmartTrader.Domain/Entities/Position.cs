@@ -25,6 +25,7 @@ namespace SmartTrader.Domain.Entities
         public string Status { get; set; } // از Enum استفاده می‌شود
         public decimal EntryPrice { get; set; }
         public decimal EntryValueUSD { get; set; }
+        public decimal? EntryQuantity { get; set; }
         public decimal CurrentQuantity { get; set; }
         public decimal? ProfitUSD { get; set; }
         public DateTime OpenTimestamp { get; set; }

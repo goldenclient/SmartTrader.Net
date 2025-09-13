@@ -46,11 +46,12 @@ namespace SmartTrader.WorkerService.Workers
                     var telegramNotifier = scope.ServiceProvider.GetRequiredService<ITelegramNotifier>(); // Resolve سرویس جدید
 
 
-                    await telegramNotifier.SendNotificationHistoryAsync($"OpenPositionWorker running at: {DateTimeOffset.Now}");
+                    //await telegramNotifier.SendNotificationHistoryAsync($"OpenPositionWorker running at: {DateTimeOffset.Now}");
 
                     foreach (var strategy in entryStrategies)
                     {
-                        if (DateTime.UtcNow < (GetNextQuarterHour(strategy.TimeFrame??15).AddMinutes(-((strategy.TimeFrame ?? 15)/5))))
+                        var nextcandle = GetNextQuarterHour(strategy.TimeFrame ?? 15);
+                        if (DateTime.UtcNow > nextcandle.AddMinutes(-((strategy.TimeFrame ?? 15)/3)))
                         {
                             var tradableCoins = await strategyRepo.GetTradableCoinsByStrategyIdAsync(strategy.StrategyID);
                             var strategyHandler = strategyFactory.CreateEntryStrategy(strategy);
@@ -87,7 +88,7 @@ namespace SmartTrader.WorkerService.Workers
                                         string symbol = exchangeInfo.Symbol;
                                         if (await positionRepo.HasOpenPositionAsync(wallet.WalletID, symbol, strategy.StrategyID))
                                         {
-                                            await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName + "-AlreadyOpen", 0);
+                                            //await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName + "-AlreadyOpen", 0);
                                             //signal.Reason = signal.Reason+"\nNot Open ==> Strategy HasOpen";
                                             //await telegramNotifier.SendNotificationAsync(signal, coin.CoinName, strategy.StrategyName, wallet.WalletName, 0);
                                             continue; // این ولت برای این کوین پوزیشن باز دارد
@@ -146,9 +147,8 @@ namespace SmartTrader.WorkerService.Workers
                                                 EntryValueUSD = positionValue,
                                                 CurrentQuantity = openResult.Quantity,
                                                 OpenTimestamp = DateTime.UtcNow,
-                                                Stoploss = signal.StopLoss,
-                                                TakeProfit = signal.TakeProfit,
-                                                Leverage = strategy.Leverage ?? 1
+                                                Leverage = strategy.Leverage ?? 1,
+                                                EntryQuantity = openResult.Quantity,
                                             };
                                             await positionRepo.CreateAsync(newPosition);
                                             _logger.LogInformation("Position for {Symbol} on wallet {WalletName} opened.", symbol, wallet.WalletName);
@@ -182,7 +182,7 @@ namespace SmartTrader.WorkerService.Workers
 
         static DateTime GetNextQuarterHour(int timeframr)
         {
-            DateTime dt = DateTime.Now;
+            DateTime dt = DateTime.UtcNow;
             int minutesToAdd = timeframr - (dt.Minute % timeframr);
             if (minutesToAdd == timeframr) minutesToAdd = 0; // اگر دقیقا مضرب باشه
 
@@ -190,10 +190,10 @@ namespace SmartTrader.WorkerService.Workers
             result = result.AddMinutes(minutesToAdd);
 
             // اگر ثانیه‌ها یا میلی‌ثانیه‌ها بیشتر از صفر بودن، باید به مضرب بعدی بره
-            if (dt.Second > 0 || dt.Millisecond > 0)
-            {
-                result = result.AddMinutes(timeframr);
-            }
+            //if (dt.Second > 0 || dt.Millisecond > 0)
+            //{
+            //    result = result.AddMinutes(timeframr);
+            //}
 
             return result;
         }

@@ -46,8 +46,6 @@ namespace SmartTrader.Infrastructure.Services
             messageBuilder.AppendLine($"**Parameters:**");
             messageBuilder.AppendLine($"- Leverage: `{signal.Leverage ?? 0}x`");
             messageBuilder.AppendLine($"- Balance %: `{signal.PercentBalance ?? 0}%`");
-            messageBuilder.AppendLine($"- Stop Loss: `{signal.StopLoss ?? 0}%`");
-            messageBuilder.AppendLine($"- Take Profit: `{signal.TakeProfit ?? 0}%`");
 
             var message = messageBuilder.ToString();
             var url = $"https://api.telegram.org/bot{_botToken}/sendMessage?chat_id={_channelId}&text={Uri.EscapeDataString(message)}&parse_mode=Markdown";
@@ -83,7 +81,7 @@ namespace SmartTrader.Infrastructure.Services
             messageBuilder.AppendLine($"🚨 **"+signal.Signal+" [ "+position.Symbol+" ]** 🚨");
             messageBuilder.AppendLine($"**WalletName:** `{walletName}`");
             messageBuilder.AppendLine($"**Price:** `{actionPrice}`");
-            messageBuilder.AppendLine($"**Pos USDT %:** `{position.EntryValueUSD}`");
+            messageBuilder.AppendLine($"**PosUSDT %:** `{position.EntryValueUSD}`");
             messageBuilder.AppendLine($"**Profit:** `{position.ProfitUSD}`");
             messageBuilder.AppendLine($"**Reason:** `{signal.Reason}`");
 

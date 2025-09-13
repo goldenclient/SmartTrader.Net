@@ -53,9 +53,6 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
                 {
                     Signal = SignalType.OpenLong,
                     Reason = "RSI < 30 and in support zone.",
-                    PercentBalance = strategy.PercentBalance ?? 5m,
-                    StopLoss = strategy.StopLoss ?? 5m,
-                    TakeProfit = strategy.TakeProfit ?? 5m,
                     Leverage = strategy.Leverage ?? 5
                 };
             }
@@ -68,9 +65,6 @@ namespace SmartTrader.Infrastructure.Strategies.Entry
                 {
                     Signal = SignalType.OpenShort,
                     Reason = "RSI > 70 and in resistance zone.",
-                    PercentBalance = strategy.PercentBalance ?? 5m,
-                    StopLoss = strategy.StopLoss ?? 5m,
-                    TakeProfit = strategy.TakeProfit ?? 5m,
                     Leverage = strategy.Leverage ?? 5
                 };
             }

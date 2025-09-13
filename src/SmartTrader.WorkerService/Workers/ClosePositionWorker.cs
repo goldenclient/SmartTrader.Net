@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using CryptoExchange.Net.Objects;
+using Microsoft.Extensions.Logging;
 using SmartTrader.Application.Interfaces.Persistence;
 using SmartTrader.Application.Interfaces.Services;
 using SmartTrader.Application.Interfaces.Strategies;
@@ -69,6 +70,9 @@ namespace SmartTrader.WorkerService.Workers
                     bool actionSuccess = false;
                     decimal actionPrice = await exchangeService.GetLastPriceAsync(position.Symbol);
 
+                    var posrealizedProfit = (actionPrice - position.EntryPrice) * position.CurrentQuantity * (position.PositionSide == SignalType.OpenLong.ToString() ? 1 : -1);
+                    await telegramNotifier.SendNotificationHistoryAsync($"{position.Symbol} : {posrealizedProfit} %");
+
 
                     if (!position.ExitStrategyID.HasValue || !strategies.TryGetValue(position.ExitStrategyID.Value, out var exitStrategy))
                     {
@@ -90,7 +94,9 @@ namespace SmartTrader.WorkerService.Workers
                             var closeResult = await exchangeService.ClosePositionAsync(position.Symbol, position.PositionSide, position.CurrentQuantity);
                             if (closeResult.IsSuccess)
                             {
-                                position.ProfitUSD = (position.ProfitUSD ?? 0) + (actionPrice - position.EntryPrice) * position.CurrentQuantity * (position.PositionSide == SignalType.OpenLong.ToString() ? 1 : -1);
+                                var realizedProfit = (actionPrice - position.EntryPrice) * position.CurrentQuantity * (position.PositionSide == SignalType.OpenLong.ToString() ? 1 : -1);
+                                position.ProfitUSD = realizedProfit;// (position.ProfitUSD ?? 0) + realizedProfit;
+                                //position.LastProfit = realizedProfit * position.Leverage;
                                 position.Status = PositionStatus.Closed.ToString();
                                 position.CloseTimestamp = DateTime.UtcNow;
                                 position.CurrentQuantity = 0;
@@ -108,12 +114,13 @@ namespace SmartTrader.WorkerService.Workers
 
                                 if (quantityToClose > 0)
                                 {
-                                    var sellResult = await exchangeService.ModifyPositionAsync(position.Symbol, SignalType.OpenLong.ToString(), quantityToClose);
+                                    var sellResult = await exchangeService.ModifyPositionAsync(position.Symbol, SignalType.OpenShort.ToString(), quantityToClose);
                                     if (sellResult.IsSuccess)
                                     {
                                         decimal realizedProfit = (actionPrice - position.EntryPrice) * sellResult.Quantity * (position.PositionSide == SignalType.OpenLong.ToString() ? 1 : -1);
                                         position.CurrentQuantity -= sellResult.Quantity;
-                                        position.ProfitUSD = (position.ProfitUSD ?? 0) + realizedProfit;
+                                        position.ProfitUSD = realizedProfit;// (position.ProfitUSD ?? 0) + realizedProfit;
+                                        //position.LastProfit = realizedProfit*position.Leverage;
                                         if (position.CurrentQuantity <= 0)
                                         {
                                             position.Status = PositionStatus.Closed.ToString();
@@ -123,12 +130,19 @@ namespace SmartTrader.WorkerService.Workers
                                         actionSuccess = true;
                                     }
                                 }
+                                if (signal.NewStopLossPrice.HasValue)
+                                {
+                                    var slResult = await positionRepo.UpdateStopLossAsync(position.PositionID, signal.NewStopLossPrice.Value);
+                                    actionSuccess = true;
+                                }
                             }
                             break;
 
                         case SignalType.ChangeSL:
                             if (signal.NewStopLossPrice.HasValue)
                             {
+                                var realizedProfit = (actionPrice - position.EntryPrice) * position.CurrentQuantity * (position.PositionSide == SignalType.OpenLong.ToString() ? 1 : -1);
+                                position.ProfitUSD = realizedProfit;// (position.ProfitUSD ?? 0) + realizedProfit;
                                 var slResult = await positionRepo.UpdateStopLossAsync(position.PositionID,signal.NewStopLossPrice.Value);
                                 actionSuccess = true;
                             }
@@ -155,6 +169,8 @@ namespace SmartTrader.WorkerService.Workers
                             signal.Signal, position.PositionID, signal.Reason);
                     }
                 }
+
+                if (openPositions.Count() == 0) await telegramNotifier.SendNotificationHistoryAsync($"keeplive running at: {DateTimeOffset.Now}");
 
                 await Task.Delay(TimeSpan.FromSeconds(_intervalSeconds), stoppingToken);
             }

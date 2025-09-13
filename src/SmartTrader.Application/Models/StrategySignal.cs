@@ -12,14 +12,11 @@ namespace SmartTrader.Application.Models
         // پارامترهای استراتژی ورود
         public decimal? PercentBalance { get; set; }
         public decimal? StopLoss { get; set; }
-        public decimal? TakeProfit { get; set; }
         public int? Leverage { get; set; }
         public string Symbol { get; set; }
         public decimal Quantity { get; set; }
         public int? PartialPercent { get; set; }
-
         // پارامترهای استراتژی خروج
-        public decimal? PercentPosition { get; set; }
         public decimal? NewStopLossPrice { get; set; }
     }
 }

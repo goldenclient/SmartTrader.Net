@@ -105,7 +105,7 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             bool isGreen = lastCandle.Close > lastCandle.Open;
             bool isRed = lastCandle.Close < lastCandle.Open;
 
-            var candleClose = GetCandleCloseTime(position.OpenTimestamp, 5);
+            var candleClose = GetCandleCloseTime(position.OpenTimestamp, strategy.TimeFrame??15);
 
             var currentPrice = lastCandle.Close;
 
@@ -120,30 +120,97 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             // اعمال لوریج برای محاسبه سود واقعی
             int leverage = position.Leverage > 0 ? position.Leverage : 1;
             pnlPercentage = priceChangePercentage * leverage;
-
-            if (pnlPercentage >= 0.1m) // 8% profit with leverage
+            if (pnlPercentage >= 0.3m) // 8% profit with leverage
             {
                 var positionHistory = await _positionRepo.GetHistoryByPositionIdAsync(position.PositionID);
 
                 // این شرط را فقط یک بار اجرا می‌کنیم
-                if (!positionHistory.Any(h => h.ActionType == SignalType.PartialClose && h.Description.Contains("Trailing SL to 5% profit and Sell 50%")))
+                if (!positionHistory.Any(h => h.ActionType == SignalType.ChangeSL && h.Description.Contains("Trailing SL to 28% profit")))
+                {
+                    decimal priceChangeFor5PercentProfit = 0.28m / leverage;
+                    decimal newStopLossPrice;
+                    if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
+                        newStopLossPrice = position.EntryPrice * (1 + priceChangeFor5PercentProfit);
+                    else // SHORT
+                        newStopLossPrice = position.EntryPrice * (1 - priceChangeFor5PercentProfit);
+                    return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Trailing SL to 28% profit", NewStopLossPrice = newStopLossPrice };
+                }
+
+            }
+            else if (pnlPercentage >= 0.25m) // 8% profit with leverage
+            {
+                var positionHistory = await _positionRepo.GetHistoryByPositionIdAsync(position.PositionID);
+
+                // این شرط را فقط یک بار اجرا می‌کنیم
+                if (!positionHistory.Any(h => h.ActionType == SignalType.ChangeSL && h.Description.Contains("Trailing SL to 22% profit")))
+                {
+                    decimal priceChangeFor5PercentProfit = 0.22m / leverage;
+                    decimal newStopLossPrice;
+                    if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
+                        newStopLossPrice = position.EntryPrice * (1 + priceChangeFor5PercentProfit);
+                    else // SHORT
+                        newStopLossPrice = position.EntryPrice * (1 - priceChangeFor5PercentProfit);
+                    return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Trailing SL to 22% profit", NewStopLossPrice = newStopLossPrice };
+                }
+
+            }
+            else if (pnlPercentage >= 0.20m) // 8% profit with leverage
+            {
+                var positionHistory = await _positionRepo.GetHistoryByPositionIdAsync(position.PositionID);
+
+                // این شرط را فقط یک بار اجرا می‌کنیم
+                if (!positionHistory.Any(h => h.ActionType == SignalType.ChangeSL && h.Description.Contains("Trailing SL to 17% profit")))
+                {
+                    decimal priceChangeFor5PercentProfit = 0.17m / leverage;
+                    decimal newStopLossPrice;
+                    if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
+                        newStopLossPrice = position.EntryPrice * (1 + priceChangeFor5PercentProfit);
+                    else // SHORT
+                        newStopLossPrice = position.EntryPrice * (1 - priceChangeFor5PercentProfit);
+                    return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Trailing SL to 17% profit", NewStopLossPrice = newStopLossPrice };
+                }
+
+            }
+            else if (pnlPercentage >= 0.15m) // 8% profit with leverage
+            {
+                var positionHistory = await _positionRepo.GetHistoryByPositionIdAsync(position.PositionID);
+
+                // این شرط را فقط یک بار اجرا می‌کنیم
+                if (!positionHistory.Any(h => h.ActionType == SignalType.ChangeSL && h.Description.Contains("Trailing SL to 12% profit")))
+                {
+                    decimal priceChangeFor5PercentProfit = 0.12m / leverage;
+                    decimal newStopLossPrice;
+                    if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
+                        newStopLossPrice = position.EntryPrice * (1 + priceChangeFor5PercentProfit);
+                    else // SHORT
+                        newStopLossPrice = position.EntryPrice * (1 - priceChangeFor5PercentProfit);
+                    return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Trailing SL to 12% profit", NewStopLossPrice = newStopLossPrice };
+                }
+
+            }
+            else if (pnlPercentage >= 0.1m) // 8% profit with leverage
+            {
+                var positionHistory = await _positionRepo.GetHistoryByPositionIdAsync(position.PositionID);
+
+                // این شرط را فقط یک بار اجرا می‌کنیم
+                if (!positionHistory.Any(h => h.ActionType == SignalType.PartialClose && h.Description.Contains("Trailing SL to 7% profit and Sell 50%")))
                 {
                     // محاسبه قیمت جدید حد ضرر بر اساس سود 5% با لوریج
-                    decimal priceChangeFor5PercentProfit = 0.05m / leverage;
+                    decimal priceChangeFor5PercentProfit = 0.07m / leverage;
                     decimal newStopLossPrice;
                     if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
                         newStopLossPrice = position.EntryPrice * (1 + priceChangeFor5PercentProfit);
                     else // SHORT
                         newStopLossPrice = position.EntryPrice * (1 - priceChangeFor5PercentProfit);
 
-                    _logger.LogInformation("Profit > 10% triggered. Moving SL to 5% profit for Position {PositionID}. New SL: {sl}", position.PositionID, newStopLossPrice);
+                    _logger.LogInformation("Profit > 10% triggered. Moving SL to 7% profit for Position {PositionID}. New SL: {sl}", position.PositionID, newStopLossPrice);
                     return new StrategySignal
                     {
                         Signal = SignalType.PartialClose,
-                        PartialPercent=50,
+                        PartialPercent=30,
                         NewStopLossPrice = newStopLossPrice,
-                        TakeProfit = position.TakeProfit * 2,
-                        Reason = "Trailing SL to 5% profit and Sell 50%"
+                        //TakeProfit = position.TakeProfit * 2,
+                        Reason = "Trailing SL to 7% profit and Sell 50%"
                     };
                 }
             }
@@ -152,52 +219,53 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
                 var positionHistory = await _positionRepo.GetHistoryByPositionIdAsync(position.PositionID);
 
                 // این شرط را فقط یک بار اجرا می‌کنیم
-                if (!positionHistory.Any(h => h.ActionType == SignalType.PartialClose && h.Description.Contains("Trailing SL to 2.5% profit and Sell 50%")))
+                if (!positionHistory.Any(h => h.ActionType == SignalType.PartialClose && h.Description.Contains("Trailing SL to 3% profit and Sell 50%")))
                 {
                     // محاسبه قیمت جدید حد ضرر بر اساس سود 5% با لوریج
-                    decimal priceChangeFor5PercentProfit = 0.025m / leverage;
+                    decimal priceChangeFor5PercentProfit = 0.03m / leverage;
                     decimal newStopLossPrice;
                     if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
                         newStopLossPrice = position.EntryPrice * (1 + priceChangeFor5PercentProfit);
                     else // SHORT
                         newStopLossPrice = position.EntryPrice * (1 - priceChangeFor5PercentProfit);
 
-                    _logger.LogInformation("Profit > 5% triggered. Moving SL to 2.5% profit for Position {PositionID}. New SL: {sl}", position.PositionID, newStopLossPrice);
+                    _logger.LogInformation("Profit > 5% triggered. Moving SL to 4% profit for Position {PositionID}. New SL: {sl}", position.PositionID, newStopLossPrice);
                     return new StrategySignal
                     {
                         Signal = SignalType.PartialClose,
-                        PartialPercent= 50,
+                        PartialPercent= 30,
                         NewStopLossPrice = newStopLossPrice,
-                        TakeProfit = position.TakeProfit * 2,
-                        Reason = "Trailing SL to 2.5% profit and Sell 50%"
+                        //TakeProfit = position.TakeProfit * 2,
+                        Reason = "Trailing SL to 3% profit and Sell 50%"
                     };
                 }
             }
-            else if (pnlPercentage >= 0.025m) // 8% profit with leverage
+            else if (pnlPercentage >= 0.03m) // 8% profit with leverage
             {
                 //return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "Trailing SL to 5% profit" };
                 var positionHistory = await _positionRepo.GetHistoryByPositionIdAsync(position.PositionID);
 
                 // این شرط را فقط یک بار اجرا می‌کنیم
-                if (!positionHistory.Any(h => h.ActionType == SignalType.PartialClose && h.Description.Contains("Trailing SL to 0.5% profit and Sell 30%")))
+                if (!positionHistory.Any(h => h.ActionType == SignalType.ChangeSL && h.Description.Contains("Trailing SL to 1% profit")))
                 {
                     // محاسبه قیمت جدید حد ضرر بر اساس سود 5% با لوریج
-                    decimal priceChangeFor5PercentProfit = 0.005m / leverage;
+                    decimal priceChangeFor5PercentProfit = 0.01m / leverage;
                     decimal newStopLossPrice;
                     if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
                         newStopLossPrice = position.EntryPrice * (1 + priceChangeFor5PercentProfit);
                     else // SHORT
                         newStopLossPrice = position.EntryPrice * (1 - priceChangeFor5PercentProfit);
+                    return new StrategySignal { Signal = SignalType.ChangeSL, Reason = "Trailing SL to 1% profit", NewStopLossPrice = newStopLossPrice };
 
-                    _logger.LogInformation("Profit > 2.5% triggered. Moving SL to 0.5% profit for Position {PositionID}. New SL: {sl}", position.PositionID, newStopLossPrice);
-                    return new StrategySignal
-                    {
-                        Signal = SignalType.PartialClose,
-                        PartialPercent=30,
-                        NewStopLossPrice = newStopLossPrice,
-                        TakeProfit = position.TakeProfit * 2,
-                        Reason = "Trailing SL to 0.5% profit and Sell 30%"
-                    };
+                    //_logger.LogInformation("Profit > 3% triggered. Moving SL to 2% profit for Position {PositionID}. New SL: {sl}", position.PositionID, newStopLossPrice);
+                    //return new StrategySignal
+                    //{
+                    //    Signal = SignalType.PartialClose,
+                    //    PartialPercent=30,
+                    //    NewStopLossPrice = newStopLossPrice,
+                    //    //TakeProfit = position.TakeProfit * 2,
+                    //    Reason = "Trailing SL to 2% profit and Sell 30%"
+                    //};
                 }
 
 
@@ -228,7 +296,8 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             //if (DateTime.UtcNow > candleClose.AddSeconds(10) && DateTime.UtcNow > curclosecandle.AddSeconds(-60) && position.Stoploss == null)
             if (DateTime.UtcNow > candleClose.AddSeconds(10) && position.Stoploss == null)
             {
-                var stoploss = prevCandle.Open;
+                var delayStop = 0;// prevCandle.Open * (0.001m) * (position.PositionSide == SignalType.OpenLong.ToString() ? -1 : 1);
+                var stoploss = prevCandle.Open + delayStop;
 
                 // اگر لانگ بود و توی سود بود استاپ وسط کندل ابتدایی
                 // وگر نه استاپ در شروع کندل
@@ -280,15 +349,13 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             {
                 return new StrategySignal { Signal = SignalType.Hold, Reason = "Minimum holding period not reached." };
             }
-            position.ProfitUSD = pnlPercentage;
-
             // ----- استراتژی خروج لانگ -----
             if (position.PositionSide.Equals(SignalType.OpenLong.ToString(), StringComparison.OrdinalIgnoreCase))
             {
-                if (rsiPrev - rsiCurr > 5 && position.ProfitUSD>0)
+                if (rsiPrev - rsiCurr > 6 && pnlPercentage > 0)
                     return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI dropped sharply (>5)." };
 
-                if (rsiCurr > 80 && isRed)
+                if (rsiCurr > 85 && isRed)
                     return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI > 80 with red candle." };
 
                 if (lastCandle.Close < position.Stoploss)
@@ -298,10 +365,10 @@ namespace SmartTrader.Infrastructure.Strategies.Exit
             // ----- استراتژی خروج شورت -----
             if (position.PositionSide.Equals(SignalType.OpenShort.ToString(), StringComparison.OrdinalIgnoreCase))
             {
-                if (rsiCurr - rsiPrev > 5 && position.ProfitUSD > 0)
+                if (rsiCurr - rsiPrev > 6 && pnlPercentage > 0)
                     return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI jumped sharply (>5)." };
 
-                if (rsiCurr < 20 && isGreen)
+                if (rsiCurr < 15 && isGreen)
                     return new StrategySignal { Signal = SignalType.CloseByTP, Reason = "RSI < 20 with green candle." };
 
                 if (lastCandle.Close > position.Stoploss)
